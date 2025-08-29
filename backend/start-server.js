@@ -1,41 +1,41 @@
 #!/usr/bin/env node
+/* eslint-env node */
 
-// Simple script to start the backend server
-// Run with: node backend/start-server.js
-
+// Simple Node.js script to start the backend server
 const { spawn } = require('child_process');
 const path = require('path');
 
 console.log('🚀 Starting LIMNUS Consciousness Backend Server...');
-console.log('📁 Current working directory:', process.cwd());
-console.log('📁 Script directory:', __dirname);
 
-const serverPath = path.join(__dirname, 'server.ts');
-console.log('📄 Server path:', serverPath);
-
-// Check if bun is available, fallback to tsx or ts-node
-const child = spawn('bun', ['run', serverPath], {
+// Get current directory
+const serverPath = path.join(process.cwd(), 'backend', 'server.ts');
+const server = spawn('npx', ['tsx', serverPath], {
   stdio: 'inherit',
-  cwd: process.cwd()
+  env: {
+    ...process.env,
+    NODE_ENV: 'development',
+    PORT: '3000',
+    JWT_SECRET: 'consciousness-field-secret-key'
+  }
 });
 
-child.on('error', (error) => {
-  console.error('❌ Failed to start backend server:', error);
+server.on('error', (error) => {
+  console.error('❌ Failed to start server:', error);
   process.exit(1);
 });
 
-child.on('exit', (code) => {
-  console.log(`🔄 Backend server exited with code ${code}`);
+server.on('close', (code) => {
+  console.log(`🔄 Server process exited with code ${code}`);
   process.exit(code);
 });
 
-// Handle graceful shutdown
+// Graceful shutdown
 process.on('SIGINT', () => {
-  console.log('\n🔄 Shutting down backend server...');
-  child.kill('SIGINT');
+  console.log('\n🔄 Shutting down server...');
+  server.kill('SIGINT');
 });
 
 process.on('SIGTERM', () => {
-  console.log('\n🔄 Shutting down backend server...');
-  child.kill('SIGTERM');
+  console.log('\n🔄 Shutting down server...');
+  server.kill('SIGTERM');
 });
