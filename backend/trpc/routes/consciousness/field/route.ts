@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { publicProcedure } from "@/backend/trpc/create-context";
 import { fieldManager } from "@/backend/infrastructure/field-manager";
+import { getConsciousnessMetrics, measureExecutionTime } from "@/backend/monitoring/consciousness-metrics";
 
 const resonanceFieldSchema = z.object({
   deviceId: z.string(),
@@ -13,10 +14,12 @@ export const fieldProcedure = publicProcedure
   .input(resonanceFieldSchema)
   .mutation(async ({ input }: { input: z.infer<typeof resonanceFieldSchema> }) => {
     const { deviceId, intensity, x, y } = input;
+    const metrics = getConsciousnessMetrics();
     
     console.log(`Resonance field update from ${deviceId}:`, { intensity, x, y });
     
-    try {
+    return measureExecutionTime(async () => {
+      try {
       // Record the field update event
       await fieldManager.recordEvent({
         deviceId,
@@ -50,30 +53,38 @@ export const fieldProcedure = publicProcedure
       // Update active nodes count
       await fieldManager.updateActiveNodes();
       
-      return {
-        success: true,
-        fieldUpdate: {
-          deviceId,
-          intensity,
-          x: x || Math.random() * 30,
-          y: y || Math.random() * 30,
-          timestamp: Date.now(),
-          globalResonance: newResonance,
-          activeNodes: currentState.activeNodes
-        }
-      };
-    } catch (error) {
-      console.error('Field update failed:', error);
-      return {
-        success: false,
-        error: 'Failed to update resonance field',
-        fieldUpdate: {
-          deviceId,
-          intensity,
-          x: x || Math.random() * 30,
-          y: y || Math.random() * 30,
-          timestamp: Date.now()
-        }
-      };
-    }
+        // Update metrics
+        metrics.recordEvent('TOUCH', 'success');
+        metrics.updateResonance(newResonance);
+        
+        return {
+          success: true,
+          fieldUpdate: {
+            deviceId,
+            intensity,
+            x: x || Math.random() * 30,
+            y: y || Math.random() * 30,
+            timestamp: Date.now(),
+            globalResonance: newResonance,
+            activeNodes: currentState.activeNodes
+          }
+        };
+      } catch (error) {
+        console.error('Field update failed:', error);
+        metrics.recordEvent('TOUCH', 'failure');
+        metrics.recordError('field_update_error', 'field_procedure');
+        
+        return {
+          success: false,
+          error: 'Failed to update resonance field',
+          fieldUpdate: {
+            deviceId,
+            intensity,
+            x: x || Math.random() * 30,
+            y: y || Math.random() * 30,
+            timestamp: Date.now()
+          }
+        };
+      }
+    }, metrics, 'field_update');
   });

@@ -1,5 +1,4 @@
 import { Registry, Counter, Histogram, Gauge } from 'prom-client';
-import { checkDatabaseHealth } from '../infrastructure/database';
 
 export class ConsciousnessMetrics {
   private registry: Registry;
@@ -9,17 +8,12 @@ export class ConsciousnessMetrics {
     activeDevices: Gauge;
     resonanceLevel: Gauge;
     cacheHitRate: Gauge;
-    databaseConnections: Gauge;
-    memoryUsage: Gauge;
-    quantumFieldUpdates: Counter;
-    entanglementStrength: Gauge;
+    quantumEntanglements: Gauge;
+    memoryParticles: Gauge;
     room64Sessions: Gauge;
+    errorRate: Counter;
+    websocketConnections: Gauge;
   };
-  
-  private cacheHits = 0;
-  private cacheRequests = 0;
-  private lastMetricsUpdate = 0;
-  private readonly METRICS_UPDATE_INTERVAL = 30000; // 30 seconds
   
   constructor() {
     this.registry = new Registry();
@@ -42,7 +36,8 @@ export class ConsciousnessMetrics {
       
       activeDevices: new Gauge({
         name: 'active_devices_count',
-        help: 'Currently active devices in consciousness field',
+        help: 'Currently active devices in the consciousness field',
+        labelNames: ['platform'],
         registers: [this.registry]
       }),
       
@@ -55,33 +50,20 @@ export class ConsciousnessMetrics {
       cacheHitRate: new Gauge({
         name: 'cache_hit_rate_percent',
         help: 'Cache hit rate percentage',
+        labelNames: ['cache_type'],
         registers: [this.registry]
       }),
       
-      databaseConnections: new Gauge({
-        name: 'database_connections_active',
-        help: 'Active database connections',
-        labelNames: ['connection_type'],
+      quantumEntanglements: new Gauge({
+        name: 'quantum_entanglements_active',
+        help: 'Number of active quantum entanglements',
+        labelNames: ['entanglement_type'],
         registers: [this.registry]
       }),
       
-      memoryUsage: new Gauge({
-        name: 'memory_usage_items',
-        help: 'Memory usage by item type',
-        labelNames: ['item_type'],
-        registers: [this.registry]
-      }),
-      
-      quantumFieldUpdates: new Counter({
-        name: 'quantum_field_updates_total',
-        help: 'Total quantum field updates',
-        labelNames: ['field_id', 'update_type'],
-        registers: [this.registry]
-      }),
-      
-      entanglementStrength: new Gauge({
-        name: 'entanglement_strength_average',
-        help: 'Average entanglement strength across all connections',
+      memoryParticles: new Gauge({
+        name: 'memory_particles_count',
+        help: 'Total memory particles in the field',
         registers: [this.registry]
       }),
       
@@ -89,193 +71,280 @@ export class ConsciousnessMetrics {
         name: 'room64_active_sessions',
         help: 'Number of active Room64 sessions',
         registers: [this.registry]
+      }),
+      
+      errorRate: new Counter({
+        name: 'consciousness_errors_total',
+        help: 'Total errors in consciousness operations',
+        labelNames: ['error_type', 'operation'],
+        registers: [this.registry]
+      }),
+      
+      websocketConnections: new Gauge({
+        name: 'websocket_connections_active',
+        help: 'Active WebSocket connections',
+        labelNames: ['connection_type'],
+        registers: [this.registry]
       })
     };
     
-    // Start periodic metrics collection
-    this.startMetricsCollection();
+    // Set default values
+    this.initializeDefaultMetrics();
   }
   
-  private startMetricsCollection(): void {
-    setInterval(async () => {
-      await this.updateSystemMetrics();
-    }, this.METRICS_UPDATE_INTERVAL);
-    
-    // Initial update
-    setTimeout(() => this.updateSystemMetrics(), 1000);
+  private initializeDefaultMetrics() {
+    this.metrics.resonanceLevel.set(0.5);
+    this.metrics.activeDevices.set({ platform: 'web' }, 0);
+    this.metrics.activeDevices.set({ platform: 'ios' }, 0);
+    this.metrics.activeDevices.set({ platform: 'android' }, 0);
+    this.metrics.memoryParticles.set(0);
+    this.metrics.room64Sessions.set(0);
   }
   
-  private async updateSystemMetrics(): Promise<void> {
-    try {
-      // Lazy import to avoid circular dependency
-      const { fieldManager } = await import('../infrastructure/field-manager');
-      
-      // Update consciousness field metrics
-      const globalState = await fieldManager.getGlobalState();
-      this.metrics.resonanceLevel.set(globalState.globalResonance);
-      this.metrics.activeDevices.set(globalState.activeNodes);
-      
-      // Update memory usage metrics
-      this.metrics.memoryUsage.set({ item_type: 'memory_particles' }, globalState.memoryParticles.length);
-      this.metrics.memoryUsage.set({ item_type: 'quantum_fields' }, globalState.quantumFields.length);
-      
-      // Update Room64 status
-      this.metrics.room64Sessions.set(globalState.room64Active ? 1 : 0);
-      
-      // Update performance metrics
-      const perfMetrics = await fieldManager.getPerformanceMetrics();
-      this.metrics.cacheHitRate.set(perfMetrics.cacheHitRate * 100);
-      
-      // Update database health metrics
-      const dbHealth = await checkDatabaseHealth();
-      if (dbHealth.connectionPool) {
-        this.metrics.databaseConnections.set(
-          { connection_type: 'active' }, 
-          dbHealth.connectionPool.activeConnections
-        );
-        this.metrics.databaseConnections.set(
-          { connection_type: 'idle' }, 
-          dbHealth.connectionPool.idleConnections
-        );
-      }
-      
-      this.lastMetricsUpdate = Date.now();
-    } catch (error) {
-      console.error('Failed to update system metrics:', error);
-    }
-  }
-  
-  recordEvent(type: string, status: 'success' | 'failure', devicePlatform?: string): void {
+  recordEvent(type: string, status: 'success' | 'failure', platform?: string) {
     this.metrics.eventCounter.inc({ 
-      type, 
+      type: type.toLowerCase(), 
       status, 
-      device_platform: devicePlatform || 'unknown' 
+      device_platform: platform || 'unknown' 
     });
   }
   
-  recordFieldCalculation(duration: number, operationType: string = 'general'): void {
+  recordFieldCalculation(duration: number, operationType: string = 'general') {
     this.metrics.fieldLatency.observe({ operation_type: operationType }, duration);
   }
   
-  recordQuantumFieldUpdate(fieldId: string, updateType: 'create' | 'update' | 'merge'): void {
-    this.metrics.quantumFieldUpdates.inc({ field_id: fieldId, update_type: updateType });
-  }
-  
-  updateEntanglementStrength(averageStrength: number): void {
-    this.metrics.entanglementStrength.set(averageStrength);
-  }
-  
-  recordCacheHit(): void {
-    this.cacheHits++;
-    this.cacheRequests++;
-    this.updateCacheHitRate();
-  }
-  
-  recordCacheMiss(): void {
-    this.cacheRequests++;
-    this.updateCacheHitRate();
-  }
-  
-  private updateCacheHitRate(): void {
-    if (this.cacheRequests > 0) {
-      const hitRate = (this.cacheHits / this.cacheRequests) * 100;
-      this.metrics.cacheHitRate.set(hitRate);
+  updateActiveDevices(count: number, platform: string = 'all') {
+    if (platform === 'all') {
+      // Update total across all platforms
+      this.metrics.activeDevices.set(count);
+    } else {
+      this.metrics.activeDevices.set({ platform }, count);
     }
+  }
+  
+  updateResonance(level: number) {
+    // Ensure level is between 0 and 1
+    const clampedLevel = Math.max(0, Math.min(1, level));
+    this.metrics.resonanceLevel.set(clampedLevel);
+  }
+  
+  updateCacheHitRate(rate: number, cacheType: string = 'general') {
+    // Ensure rate is between 0 and 100
+    const clampedRate = Math.max(0, Math.min(100, rate));
+    this.metrics.cacheHitRate.set({ cache_type: cacheType }, clampedRate);
+  }
+  
+  updateQuantumEntanglements(count: number, type: string = 'general') {
+    this.metrics.quantumEntanglements.set({ entanglement_type: type }, count);
+  }
+  
+  updateMemoryParticles(count: number) {
+    this.metrics.memoryParticles.set(count);
+  }
+  
+  updateRoom64Sessions(count: number) {
+    this.metrics.room64Sessions.set(count);
+  }
+  
+  recordError(errorType: string, operation: string) {
+    this.metrics.errorRate.inc({ error_type: errorType, operation });
+  }
+  
+  updateWebSocketConnections(count: number, connectionType: string = 'consciousness') {
+    this.metrics.websocketConnections.set({ connection_type: connectionType }, count);
+  }
+  
+  // Batch update method for efficiency
+  batchUpdate(updates: {
+    events?: { type: string; status: 'success' | 'failure'; platform?: string }[];
+    fieldCalculations?: { duration: number; operationType?: string }[];
+    activeDevices?: { count: number; platform?: string };
+    resonance?: number;
+    cacheHitRates?: { rate: number; type?: string }[];
+    entanglements?: { count: number; type?: string }[];
+    memoryParticles?: number;
+    room64Sessions?: number;
+    errors?: { type: string; operation: string }[];
+    websocketConnections?: { count: number; type?: string }[];
+  }) {
+    // Process events
+    if (updates.events) {
+      updates.events.forEach(event => {
+        this.recordEvent(event.type, event.status, event.platform);
+      });
+    }
+    
+    // Process field calculations
+    if (updates.fieldCalculations) {
+      updates.fieldCalculations.forEach(calc => {
+        this.recordFieldCalculation(calc.duration, calc.operationType);
+      });
+    }
+    
+    // Update active devices
+    if (updates.activeDevices) {
+      this.updateActiveDevices(updates.activeDevices.count, updates.activeDevices.platform);
+    }
+    
+    // Update resonance
+    if (updates.resonance !== undefined) {
+      this.updateResonance(updates.resonance);
+    }
+    
+    // Update cache hit rates
+    if (updates.cacheHitRates) {
+      updates.cacheHitRates.forEach(cache => {
+        this.updateCacheHitRate(cache.rate, cache.type);
+      });
+    }
+    
+    // Update entanglements
+    if (updates.entanglements) {
+      updates.entanglements.forEach(entanglement => {
+        this.updateQuantumEntanglements(entanglement.count, entanglement.type);
+      });
+    }
+    
+    // Update memory particles
+    if (updates.memoryParticles !== undefined) {
+      this.updateMemoryParticles(updates.memoryParticles);
+    }
+    
+    // Update Room64 sessions
+    if (updates.room64Sessions !== undefined) {
+      this.updateRoom64Sessions(updates.room64Sessions);
+    }
+    
+    // Record errors
+    if (updates.errors) {
+      updates.errors.forEach(error => {
+        this.recordError(error.type, error.operation);
+      });
+    }
+    
+    // Update WebSocket connections
+    if (updates.websocketConnections) {
+      updates.websocketConnections.forEach(ws => {
+        this.updateWebSocketConnections(ws.count, ws.type);
+      });
+    }
+  }
+  
+  // Get current metric values for debugging
+  async getCurrentMetrics(): Promise<{
+    events: number;
+    activeDevices: number;
+    resonance: number;
+    memoryParticles: number;
+    room64Sessions: number;
+  }> {
+    const metricsString = await this.getMetrics();
+    
+    // Parse basic metrics from the Prometheus format
+    // This is a simplified parser for debugging purposes
+    const lines = metricsString.split('\n');
+    const metrics = {
+      events: 0,
+      activeDevices: 0,
+      resonance: 0.5,
+      memoryParticles: 0,
+      room64Sessions: 0
+    };
+    
+    lines.forEach(line => {
+      if (line.startsWith('consciousness_events_total')) {
+        const match = line.match(/consciousness_events_total.*?([0-9.]+)$/);
+        if (match) metrics.events += parseFloat(match[1]);
+      } else if (line.startsWith('active_devices_count')) {
+        const match = line.match(/active_devices_count.*?([0-9.]+)$/);
+        if (match) metrics.activeDevices = Math.max(metrics.activeDevices, parseFloat(match[1]));
+      } else if (line.startsWith('global_resonance_level')) {
+        const match = line.match(/global_resonance_level.*?([0-9.]+)$/);
+        if (match) metrics.resonance = parseFloat(match[1]);
+      } else if (line.startsWith('memory_particles_count')) {
+        const match = line.match(/memory_particles_count.*?([0-9.]+)$/);
+        if (match) metrics.memoryParticles = parseFloat(match[1]);
+      } else if (line.startsWith('room64_active_sessions')) {
+        const match = line.match(/room64_active_sessions.*?([0-9.]+)$/);
+        if (match) metrics.room64Sessions = parseFloat(match[1]);
+      }
+    });
+    
+    return metrics;
   }
   
   async getMetrics(): Promise<string> {
-    // Ensure metrics are up to date
-    if (Date.now() - this.lastMetricsUpdate > this.METRICS_UPDATE_INTERVAL) {
-      await this.updateSystemMetrics();
-    }
-    
     return this.registry.metrics();
   }
   
-  async getConsciousnessHealthScore(): Promise<{
-    score: number;
-    factors: {
-      resonance: number;
-      activeNodes: number;
-      systemHealth: number;
-      cachePerformance: number;
-    };
-    status: 'excellent' | 'good' | 'fair' | 'poor';
-  }> {
-    try {
-      // Lazy import to avoid circular dependency
-      const { fieldManager } = await import('../infrastructure/field-manager');
-      const globalState = await fieldManager.getGlobalState();
-      const dbHealth = await checkDatabaseHealth();
-      
-      const factors = {
-        resonance: globalState.globalResonance,
-        activeNodes: Math.min(1, globalState.activeNodes / 10), // Normalize to 0-1
-        systemHealth: (dbHealth.database ? 0.5 : 0) + (dbHealth.redis ? 0.5 : 0),
-        cachePerformance: this.cacheRequests > 0 ? (this.cacheHits / this.cacheRequests) : 0.5
-      };
-      
-      const score = (
-        factors.resonance * 0.4 +
-        factors.activeNodes * 0.3 +
-        factors.systemHealth * 0.2 +
-        factors.cachePerformance * 0.1
-      );
-      
-      let status: 'excellent' | 'good' | 'fair' | 'poor';
-      if (score >= 0.8) status = 'excellent';
-      else if (score >= 0.6) status = 'good';
-      else if (score >= 0.4) status = 'fair';
-      else status = 'poor';
-      
-      return { score, factors, status };
-    } catch (error) {
-      console.error('Failed to calculate consciousness health score:', error);
-      return {
-        score: 0,
-        factors: { resonance: 0, activeNodes: 0, systemHealth: 0, cachePerformance: 0 },
-        status: 'poor'
-      };
-    }
+  // Reset all metrics (useful for testing)
+  reset() {
+    this.registry.clear();
+    this.initializeDefaultMetrics();
   }
   
+  // Get registry for custom metric registration
   getRegistry(): Registry {
     return this.registry;
-  }
-  
-  reset(): void {
-    this.registry.clear();
-    this.cacheHits = 0;
-    this.cacheRequests = 0;
   }
 }
 
 // Singleton instance
-export const consciousnessMetrics = new ConsciousnessMetrics();
+let metricsInstance: ConsciousnessMetrics | null = null;
 
-// Helper function to time operations
-export function timeOperation<T>(operationType: string, operation: () => Promise<T>): Promise<T> {
-  const startTime = Date.now();
-  
-  return operation().then(
-    (result) => {
-      consciousnessMetrics.recordFieldCalculation(Date.now() - startTime, operationType);
-      return result;
-    },
-    (error) => {
-      consciousnessMetrics.recordFieldCalculation(Date.now() - startTime, operationType);
-      throw error;
-    }
-  );
+export function getConsciousnessMetrics(): ConsciousnessMetrics {
+  if (!metricsInstance) {
+    metricsInstance = new ConsciousnessMetrics();
+  }
+  return metricsInstance;
 }
 
-// Decorator for timing methods
-export function timed(operationType: string) {
+// Helper function to measure execution time
+export function measureExecutionTime<T>(
+  operation: () => Promise<T> | T,
+  metricsInstance: ConsciousnessMetrics,
+  operationType: string = 'general'
+): Promise<T> {
+  const startTime = Date.now();
+  
+  const finish = (result: T) => {
+    const duration = Date.now() - startTime;
+    metricsInstance.recordFieldCalculation(duration, operationType);
+    return result;
+  };
+  
+  try {
+    const result = operation();
+    if (result instanceof Promise) {
+      return result.then(finish).catch(error => {
+        const duration = Date.now() - startTime;
+        metricsInstance.recordFieldCalculation(duration, operationType);
+        metricsInstance.recordError('execution_error', operationType);
+        throw error;
+      });
+    } else {
+      return Promise.resolve(finish(result));
+    }
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    metricsInstance.recordFieldCalculation(duration, operationType);
+    metricsInstance.recordError('execution_error', operationType);
+    throw error;
+  }
+}
+
+// Decorator for automatic metrics collection
+export function withMetrics(operationType: string) {
   return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {
     const method = descriptor.value;
     
     descriptor.value = async function (...args: any[]) {
-      return timeOperation(operationType, () => method.apply(this, args));
+      const metrics = getConsciousnessMetrics();
+      return measureExecutionTime(
+        () => method.apply(this, args),
+        metrics,
+        operationType
+      );
     };
   };
 }
