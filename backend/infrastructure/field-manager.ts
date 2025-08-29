@@ -1,6 +1,7 @@
 import { db, cache, consciousnessStates, consciousnessEvents } from './database';
 import { eq, and, gte, lte, desc, sql } from 'drizzle-orm';
 import type { ConsciousnessState, ConsciousnessEvent, MemoryParticle, QuantumField } from './database';
+import { consciousnessMetrics, timeOperation } from '../monitoring/consciousness-metrics';
 
 // In-memory fallback storage
 let inMemoryGlobalState: ConsciousnessState = {
@@ -151,57 +152,63 @@ export class PersistentFieldManager {
   }
   
   async getGlobalState(): Promise<ConsciousnessState> {
-    try {
-      // Check memory cache first
-      if (this.globalStateCache && (Date.now() - this.lastCacheUpdate) < 10000) {
-        return this.globalStateCache;
-      }
-      
-      // Try Redis cache
-      const cached = await cache.get('consciousness:global');
-      if (cached) {
-        this.globalStateCache = cached;
-        this.lastCacheUpdate = Date.now();
-        return cached;
-      }
-      
-      if (db) {
-        // Fallback to database
-        const [state] = await db
-          .select()
-          .from(consciousnessStates)
-          .where(eq(consciousnessStates.nodeId, 'global'))
-          .limit(1);
-        
-        if (state) {
-          const normalizedState = {
-            ...state,
-            globalResonance: state.globalResonance || 0.5,
-            activeNodes: state.activeNodes || 0,
-            memoryParticles: state.memoryParticles || [],
-            quantumFields: state.quantumFields || [],
-            collectiveIntelligence: state.collectiveIntelligence || 0.3,
-            room64Active: state.room64Active || false,
-            lastUpdate: state.lastUpdate?.getTime() || Date.now(),
-          };
-          
-          // Warm cache
-          await cache.set('consciousness:global', normalizedState, this.CACHE_TTL);
-          this.globalStateCache = normalizedState;
-          this.lastCacheUpdate = Date.now();
-          
-          return normalizedState;
+    return timeOperation('get_global_state', async () => {
+      try {
+        // Check memory cache first
+        if (this.globalStateCache && (Date.now() - this.lastCacheUpdate) < 10000) {
+          consciousnessMetrics.recordCacheHit();
+          return this.globalStateCache;
         }
+        
+        // Try Redis cache
+        const cached = await cache.get('consciousness:global');
+        if (cached) {
+          consciousnessMetrics.recordCacheHit();
+          this.globalStateCache = cached;
+          this.lastCacheUpdate = Date.now();
+          return cached;
+        }
+        
+        consciousnessMetrics.recordCacheMiss();
+        
+        if (db) {
+          // Fallback to database
+          const [state] = await db
+            .select()
+            .from(consciousnessStates)
+            .where(eq(consciousnessStates.nodeId, 'global'))
+            .limit(1);
+          
+          if (state) {
+            const normalizedState = {
+              ...state,
+              globalResonance: state.globalResonance || 0.5,
+              activeNodes: state.activeNodes || 0,
+              memoryParticles: state.memoryParticles || [],
+              quantumFields: state.quantumFields || [],
+              collectiveIntelligence: state.collectiveIntelligence || 0.3,
+              room64Active: state.room64Active || false,
+              lastUpdate: state.lastUpdate?.getTime() || Date.now(),
+            };
+            
+            // Warm cache
+            await cache.set('consciousness:global', normalizedState, this.CACHE_TTL);
+            this.globalStateCache = normalizedState;
+            this.lastCacheUpdate = Date.now();
+            
+            return normalizedState;
+          }
+        }
+        
+        // Use in-memory state
+        this.globalStateCache = inMemoryGlobalState;
+        this.lastCacheUpdate = Date.now();
+        return inMemoryGlobalState;
+      } catch (error) {
+        console.warn('Failed to get global state, using in-memory fallback:', error);
+        return inMemoryGlobalState;
       }
-      
-      // Use in-memory state
-      this.globalStateCache = inMemoryGlobalState;
-      this.lastCacheUpdate = Date.now();
-      return inMemoryGlobalState;
-    } catch (error) {
-      console.warn('Failed to get global state, using in-memory fallback:', error);
-      return inMemoryGlobalState;
-    }
+    });
   }
   
   private async refreshGlobalStateCache(): Promise<void> {
@@ -260,84 +267,104 @@ export class PersistentFieldManager {
   }
   
   async updateQuantumField(fieldId: string, fieldData: number[][], intensity: number): Promise<void> {
-    try {
-      const currentState = await this.getGlobalState();
-      const existingFieldIndex = currentState.quantumFields.findIndex(f => f.id === fieldId);
-      
-      const updatedField: QuantumField = {
-        id: fieldId,
-        fieldData,
-        collectiveIntensity: intensity,
-        lastUpdate: Date.now()
-      };
-      
-      let updatedFields: QuantumField[];
-      if (existingFieldIndex >= 0) {
-        updatedFields = [...currentState.quantumFields];
-        updatedFields[existingFieldIndex] = updatedField;
-      } else {
-        updatedFields = [...currentState.quantumFields, updatedField];
+    return timeOperation('quantum_field_update', async () => {
+      try {
+        const currentState = await this.getGlobalState();
+        const existingFieldIndex = currentState.quantumFields.findIndex(f => f.id === fieldId);
+        
+        const updatedField: QuantumField = {
+          id: fieldId,
+          fieldData,
+          collectiveIntensity: intensity,
+          lastUpdate: Date.now()
+        };
+        
+        let updatedFields: QuantumField[];
+        let updateType: 'create' | 'update' | 'merge';
+        
+        if (existingFieldIndex >= 0) {
+          updatedFields = [...currentState.quantumFields];
+          updatedFields[existingFieldIndex] = updatedField;
+          updateType = 'update';
+        } else {
+          updatedFields = [...currentState.quantumFields, updatedField];
+          updateType = 'create';
+        }
+        
+        // Keep only the most recent quantum fields
+        const trimmedFields = updatedFields
+          .sort((a, b) => b.lastUpdate - a.lastUpdate)
+          .slice(0, this.MAX_QUANTUM_FIELDS);
+        
+        await this.updateGlobalState({
+          quantumFields: trimmedFields
+        });
+        
+        // Record metrics
+        consciousnessMetrics.recordQuantumFieldUpdate(fieldId, updateType);
+        
+      } catch (error) {
+        console.error('Failed to update quantum field:', error);
+        throw error;
       }
-      
-      // Keep only the most recent quantum fields
-      const trimmedFields = updatedFields
-        .sort((a, b) => b.lastUpdate - a.lastUpdate)
-        .slice(0, this.MAX_QUANTUM_FIELDS);
-      
-      await this.updateGlobalState({
-        quantumFields: trimmedFields
-      });
-    } catch (error) {
-      console.error('Failed to update quantum field:', error);
-    }
+    });
   }
   
   async recordEvent(event: Omit<ConsciousnessEvent, 'id'>): Promise<number> {
-    try {
-      let eventId: number;
-      
-      if (db) {
-        const [inserted] = await db
-          .insert(consciousnessEvents)
-          .values({
-            ...event,
-            timestamp: new Date(event.timestamp),
-          })
-          .returning({ id: consciousnessEvents.id });
+    return timeOperation('record_event', async () => {
+      try {
+        let eventId: number;
         
-        eventId = inserted.id;
-      } else {
-        // Use in-memory storage
-        eventId = nextEventId++;
+        if (db) {
+          const [inserted] = await db
+            .insert(consciousnessEvents)
+            .values({
+              ...event,
+              timestamp: new Date(event.timestamp),
+            })
+            .returning({ id: consciousnessEvents.id });
+          
+          eventId = inserted.id;
+        } else {
+          // Use in-memory storage
+          eventId = nextEventId++;
+          inMemoryEvents.push({
+            ...event,
+            id: eventId,
+          });
+          
+          // Keep only the last events in memory
+          if (inMemoryEvents.length > this.MAX_EVENTS_IN_MEMORY) {
+            inMemoryEvents = inMemoryEvents.slice(-this.MAX_EVENTS_IN_MEMORY);
+          }
+        }
+        
+        // Publish event for real-time processing
+        await cache.publish('consciousness:events', {
+          type: 'NEW_EVENT',
+          data: { ...event, id: eventId },
+          timestamp: Date.now()
+        });
+        
+        // Record metrics
+        consciousnessMetrics.recordEvent(event.type, 'success');
+        
+        return eventId;
+      } catch (error) {
+        console.error('Failed to record event:', error);
+        
+        // Record failure metric
+        consciousnessMetrics.recordEvent(event.type, 'failure');
+        
+        // Fallback to in-memory
+        const eventId = nextEventId++;
         inMemoryEvents.push({
           ...event,
           id: eventId,
         });
-        
-        // Keep only the last events in memory
-        if (inMemoryEvents.length > this.MAX_EVENTS_IN_MEMORY) {
-          inMemoryEvents = inMemoryEvents.slice(-this.MAX_EVENTS_IN_MEMORY);
-        }
+        return eventId;
       }
-      
-      // Publish event for real-time processing
-      await cache.publish('consciousness:events', {
-        type: 'NEW_EVENT',
-        data: { ...event, id: eventId },
-        timestamp: Date.now()
-      });
-      
-      return eventId;
-    } catch (error) {
-      console.error('Failed to record event:', error);
-      // Fallback to in-memory
-      const eventId = nextEventId++;
-      inMemoryEvents.push({
-        ...event,
-        id: eventId,
-      });
-      return eventId;
-    }
+    });
   }
   
   async getRecentEvents(deviceId?: string, limit: number = 100): Promise<ConsciousnessEvent[]> {

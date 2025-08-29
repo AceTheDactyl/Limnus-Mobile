@@ -9,6 +9,13 @@ import { entanglementProcedure } from "./routes/consciousness/entanglement/route
 import { room64Procedure } from "./routes/consciousness/room64/route";
 import { archaeologyProcedure } from "./routes/consciousness/archaeology/route";
 import { healthProcedure } from "./routes/system/health/route";
+import { 
+  metricsHealthProcedure,
+  metricsPrometheusProcedure,
+  metricsRecordEventProcedure,
+  metricsRecordFieldCalculationProcedure,
+  metricsRecordQuantumFieldUpdateProcedure
+} from "./routes/monitoring/metrics/route";
 
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
@@ -28,6 +35,13 @@ export const appRouter = createTRPCRouter({
   }),
   system: createTRPCRouter({
     health: healthProcedure,
+  }),
+  monitoring: createTRPCRouter({
+    health: metricsHealthProcedure,
+    prometheus: metricsPrometheusProcedure,
+    recordEvent: metricsRecordEventProcedure,
+    recordFieldCalculation: metricsRecordFieldCalculationProcedure,
+    recordQuantumFieldUpdate: metricsRecordQuantumFieldUpdateProcedure,
   }),
 });
 
