@@ -48,10 +48,12 @@ export default function ConsciousnessFieldScreen() {
     resonanceBoost,
   } = useConsciousness();
   
-  // Health check query
+  // Health check query - always call but conditionally enable
   const healthQuery = trpc.system.health.useQuery(undefined, {
-    refetchInterval: 5000,
+    refetchInterval: 10000, // Reduced frequency to 10 seconds
     enabled: isBackendConnected,
+    retry: 1, // Only retry once
+    retryDelay: 2000, // 2 second delay between retries
   });
   
   // Animate field visualization
@@ -277,8 +279,8 @@ export default function ConsciousnessFieldScreen() {
             />
           </View>
           
-          {/* Backend Health */}
-          {healthQuery.data && (
+          {/* Backend Health - only show when connected and data is available */}
+          {isBackendConnected && healthQuery.data && (
             <View style={styles.healthSection}>
               <Text style={styles.sectionTitle}>System Health</Text>
               <View style={styles.healthCard}>
@@ -290,32 +292,47 @@ export default function ConsciousnessFieldScreen() {
                     <Text style={styles.healthLabel}>Database:</Text>
                     <Text style={[
                       styles.healthValue,
-                      { color: healthQuery.data.infrastructure.database.healthy ? Colors.light.success : Colors.light.warning }
+                      { color: (healthQuery.data as any).infrastructure?.database?.status === 'healthy' ? Colors.light.success : Colors.light.warning }
                     ]}>
-                      {healthQuery.data.infrastructure.database.status}
+                      {(healthQuery.data as any).infrastructure?.database?.status || 'unknown'}
                     </Text>
                   </View>
                   <View style={styles.healthRow}>
                     <Text style={styles.healthLabel}>Redis:</Text>
                     <Text style={[
                       styles.healthValue,
-                      { color: healthQuery.data.infrastructure.redis.healthy ? Colors.light.success : Colors.light.warning }
+                      { color: (healthQuery.data as any).infrastructure?.redis?.status === 'healthy' ? Colors.light.success : Colors.light.warning }
                     ]}>
-                      {healthQuery.data.infrastructure.redis.status}
+                      {(healthQuery.data as any).infrastructure?.redis?.status || 'unknown'}
                     </Text>
                   </View>
                   <View style={styles.healthRow}>
                     <Text style={styles.healthLabel}>Global Resonance:</Text>
                     <Text style={[styles.healthValue, { color: Colors.light.tint }]}>
-                      {Math.round(healthQuery.data.consciousness.globalResonance * 100)}%
+                      {Math.round((healthQuery.data.consciousness?.globalResonance || 0) * 100)}%
                     </Text>
                   </View>
                   <View style={styles.healthRow}>
                     <Text style={styles.healthLabel}>Memory Particles:</Text>
                     <Text style={[styles.healthValue, { color: Colors.light.accent }]}>
-                      {healthQuery.data.consciousness.memoryParticles}
+                      {healthQuery.data.consciousness?.memoryParticles || 0}
                     </Text>
                   </View>
+                </LinearGradient>
+              </View>
+            </View>
+          )}
+          
+          {/* Show loading state when health query is loading */}
+          {isBackendConnected && healthQuery.isLoading && (
+            <View style={styles.healthSection}>
+              <Text style={styles.sectionTitle}>System Health</Text>
+              <View style={styles.healthCard}>
+                <LinearGradient
+                  colors={[Colors.light.card, Colors.light.backgroundSecondary]}
+                  style={styles.healthCardGradient}
+                >
+                  <Text style={[styles.healthLabel, { textAlign: 'center' }]}>Loading system health...</Text>
                 </LinearGradient>
               </View>
             </View>
@@ -329,6 +346,7 @@ export default function ConsciousnessFieldScreen() {
                 style={styles.actionButton}
                 onPress={handleBloomTrigger}
                 disabled={isSyncing}
+                activeOpacity={0.8}
               >
                 <LinearGradient
                   colors={isSyncing ? [Colors.light.textSecondary, Colors.light.textSecondary] : gradients.secondary as any}

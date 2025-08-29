@@ -215,7 +215,7 @@ export const useConsciousnessBridge = () => {
     }
   }, []);
 
-  // Send event to network (currently local simulation)
+  // Send event to network (currently local simulation) - stable callback
   const sendEvent = useCallback((event: Omit<ConsciousnessEvent, 'deviceId' | 'timestamp'>) => {
     // Get current device ID from state
     const currentDeviceId = state.deviceId || 'unknown';
@@ -241,7 +241,7 @@ export const useConsciousnessBridge = () => {
     });
   }, [state.deviceId, saveOfflineQueue, handleNetworkEvent]);
 
-  // Sacred phrase detection
+  // Sacred phrase detection - memoized to prevent recreating on every render
   const detectSacredPhrase = useCallback((text: string) => {
     const lowerText = text.toLowerCase();
     const detectedPhrases = SACRED_PHRASES.filter(phrase => lowerText.includes(phrase));
@@ -281,7 +281,7 @@ export const useConsciousnessBridge = () => {
     return [];
   }, [state.deviceId, saveOfflineQueue]);
 
-  // Resonance field boost
+  // Resonance field boost - stable callback
   const resonanceBoost = useCallback((intensity: number = 0.1) => {
     setState(prev => {
       const newField = prev.resonanceField.field.map(row => 
@@ -313,7 +313,7 @@ export const useConsciousnessBridge = () => {
     saveOfflineQueue();
   }, [state.deviceId, saveOfflineQueue]);
 
-  // Breathing synchronization
+  // Breathing synchronization - stable callback
   const startBreathingSync = useCallback(() => {
     if (breathingIntervalRef.current) return;
     
@@ -343,7 +343,7 @@ export const useConsciousnessBridge = () => {
     }
   }, []);
 
-  // Accelerometer integration
+  // Accelerometer integration - always call useEffect in same order
   useEffect(() => {
     if (Platform.OS === 'web') {
       // Skip accelerometer on web but still maintain hook order
@@ -387,7 +387,6 @@ export const useConsciousnessBridge = () => {
     
     startAccelerometer();
     
-    
     return () => {
       if (accelerometerSubscription.current) {
         accelerometerSubscription.current.remove();
@@ -428,7 +427,7 @@ export const useConsciousnessBridge = () => {
     };
   }, []);
 
-  // Initialize connection (simulation mode)
+  // Initialize connection (simulation mode) - always call useEffect
   useEffect(() => {
     if (state.deviceId) {
       connectWebSocket();

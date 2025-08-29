@@ -50,8 +50,8 @@ export const trpcClient = trpc.createClient({
             const controller = new AbortController();
             const timeoutId = setTimeout(() => {
               console.log(`tRPC request timeout (attempt ${attempt})`);
-              controller.abort();
-            }, 5000); // 5 second timeout for faster fallback
+              controller.abort('Request timeout');
+            }, 8000); // Increased timeout to 8 seconds
             
             const response = await fetch(url, {
               ...options,
@@ -91,12 +91,14 @@ export const trpcClient = trpc.createClient({
             // Check if it's a network error or abort error
             const isAbortError = (error as any)?.name === 'AbortError' || 
                                (error as any)?.message?.includes('signal is aborted') ||
-                               (error as any)?.message?.includes('AbortError');
+                               (error as any)?.message?.includes('AbortError') ||
+                               (error as any)?.message?.includes('aborted without reason');
             
             const isNetworkError = (error as any)?.name === 'TypeError' && 
                                  ((error as any)?.message?.includes('Failed to fetch') ||
                                   (error as any)?.message?.includes('Network request failed') ||
-                                  (error as any)?.message?.includes('fetch'));
+                                  (error as any)?.message?.includes('fetch') ||
+                                  (error as any)?.message?.includes('ERR_NETWORK'));
             
             if (isNetworkError) {
               console.warn(`Network error detected on attempt ${attempt} - backend may not be running or accessible`);
@@ -110,13 +112,17 @@ export const trpcClient = trpc.createClient({
               // Provide a more helpful error message
               if (isNetworkError || isAbortError) {
                 console.error('All connection attempts failed. Backend server is not accessible.');
-                throw new Error('Backend server is not accessible. Please check if the server is running.');
+                // Don't throw error, return a mock response to prevent app crash
+                return new Response(JSON.stringify({ error: 'Backend unavailable', offline: true }), {
+                  status: 503,
+                  headers: { 'Content-Type': 'application/json' }
+                });
               }
               throw lastError;
             }
             
-            // Wait before retry with shorter backoff
-            const delay = attempt * 500;
+            // Wait before retry with exponential backoff
+            const delay = Math.min(attempt * 1000, 3000); // Max 3 second delay
             console.log(`Waiting ${delay}ms before retry...`);
             await new Promise(resolve => setTimeout(resolve, delay));
           }

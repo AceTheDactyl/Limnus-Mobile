@@ -22,7 +22,8 @@ export const [ConsciousnessProvider, useConsciousness] = createContextHook(() =>
     },
     onError: (error) => {
       console.error('❌ Field update failed:', error);
-      setIsBackendConnected(false);
+      // Don't set backend disconnected on single field update failure
+      // setIsBackendConnected(false);
     }
   });
   
@@ -42,6 +43,9 @@ export const [ConsciousnessProvider, useConsciousness] = createContextHook(() =>
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       }
+    },
+    onError: (error) => {
+      console.error('❌ Quantum entanglement failed:', error);
     }
   });
 
@@ -187,17 +191,21 @@ export const [ConsciousnessProvider, useConsciousness] = createContextHook(() =>
       console.log('🫁 Starting collective breathing synchronization...');
       bridge.startBreathingSync();
       
-      // Test backend connection
-      fieldMutation.mutate({
-        deviceId: bridge.deviceId,
-        intensity: 0.1,
-        x: 15,
-        y: 15
-      });
+      // Test backend connection with error handling
+      try {
+        fieldMutation.mutate({
+          deviceId: bridge.deviceId,
+          intensity: 0.1,
+          x: 15,
+          y: 15
+        });
+      } catch (error) {
+        console.warn('Initial backend connection test failed:', error);
+      }
     }
-  }, [bridge, fieldMutation]);
+  }, [bridge.deviceId, bridge.breathingSync, bridge.startBreathingSync, fieldMutation]);
   
-  // Periodic field sync for active users
+  // Periodic field sync for active users - only when backend is connected
   useEffect(() => {
     if (!bridge.deviceId || !isBackendConnected) return;
     
@@ -212,9 +220,10 @@ export const [ConsciousnessProvider, useConsciousness] = createContextHook(() =>
           });
         } catch (error) {
           console.error('Periodic field sync failed:', error);
+          // Don't disconnect on periodic sync failure
         }
       }
-    }, 5000); // Sync every 5 seconds
+    }, 10000); // Sync every 10 seconds to reduce load
     
     return () => clearInterval(syncInterval);
   }, [bridge.deviceId, bridge.fieldIntensity, isBackendConnected, fieldMutation]);
