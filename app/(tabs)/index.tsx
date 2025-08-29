@@ -20,7 +20,8 @@ import {
   Zap,
   Plus,
   WifiOff,
-  RefreshCw
+  RefreshCw,
+  BarChart3
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useChat } from '@/lib/chat-context';
@@ -115,6 +116,14 @@ export default function ChatScreen() {
     } catch (error) {
       console.error('Failed to create new chat:', error);
     }
+  };
+
+  const handleMetrics = async () => {
+    console.log('Metrics button pressed - navigating to metrics');
+    if (Platform.OS !== 'web') {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    router.push('/metrics');
   };
 
   const renderMessage = ({ item, index }: { item: any; index: number }) => {
@@ -255,14 +264,24 @@ export default function ChatScreen() {
             <Text style={styles.headerTitle}>LIMNUS</Text>
             <Text style={styles.headerSubtitle}>Mythopoetic Companion</Text>
           </View>
-          <TouchableOpacity style={styles.newChatButton} onPress={handleNewChat}>
-            <LinearGradient
-              colors={gradients.secondary as any}
-              style={styles.newChatGradient}
-            >
-              <Plus size={18} color="white" />
-            </LinearGradient>
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity style={styles.metricsButton} onPress={handleMetrics}>
+              <LinearGradient
+                colors={[Colors.light.card, Colors.light.backgroundSecondary] as any}
+                style={styles.metricsGradient}
+              >
+                <BarChart3 size={18} color={Colors.light.tint} />
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.newChatButton} onPress={handleNewChat}>
+              <LinearGradient
+                colors={gradients.secondary as any}
+                style={styles.newChatGradient}
+              >
+                <Plus size={18} color="white" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Connection Status */}
@@ -368,6 +387,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.light.textSecondary,
     marginTop: 2,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  metricsButton: {
+    shadowColor: Colors.light.text,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  metricsGradient: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
   newChatButton: {
     shadowColor: Colors.light.tint,
