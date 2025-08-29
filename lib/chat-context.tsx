@@ -164,15 +164,17 @@ export const [ChatProvider, useChat] = createContextHook(() => {
   // Save conversation to local storage
   const saveConversationToStorage = useCallback(async (conversationId: string, messages: Message[]) => {
     try {
-      if (messages.length >= 2) { // At least one user message and one assistant response
+      if (messages.length >= 1) { // At least one user message
         const userMessage = messages.find(m => m.role === 'user');
         const assistantMessage = messages.find(m => m.role === 'assistant');
         
-        if (userMessage && assistantMessage) {
+        if (userMessage) {
           const conversation: Conversation = {
             id: conversationId,
             title: generateConversationTitle(userMessage.content),
-            lastMessage: assistantMessage.content.slice(0, 100) + (assistantMessage.content.length > 100 ? '...' : ''),
+            lastMessage: assistantMessage ? 
+              assistantMessage.content.slice(0, 100) + (assistantMessage.content.length > 100 ? '...' : '') :
+              'Conversation started...',
             timestamp: Date.now(),
           };
           
@@ -294,7 +296,8 @@ export const [ChatProvider, useChat] = createContextHook(() => {
     };
 
     // Add user message immediately
-    setMessages(prev => [...prev, userMessage]);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
     setIsSending(true);
     setIsStreaming(true);
     setStreamingMessage('');
@@ -303,6 +306,10 @@ export const [ChatProvider, useChat] = createContextHook(() => {
     if (!currentConversationId) {
       setCurrentConversationId(conversationId);
     }
+    
+    // Save conversation immediately after user sends first message
+    await saveConversationToStorage(conversationId, updatedMessages);
+    await reloadConversations();
 
     try {
       console.log('Attempting tRPC call with:', { conversationId, message: content.trim() });
