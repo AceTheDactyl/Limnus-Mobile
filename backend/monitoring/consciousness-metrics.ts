@@ -1,5 +1,4 @@
 import { Registry, Counter, Histogram, Gauge } from 'prom-client';
-import { fieldManager } from '../infrastructure/field-manager';
 import { checkDatabaseHealth } from '../infrastructure/database';
 
 export class ConsciousnessMetrics {
@@ -108,6 +107,9 @@ export class ConsciousnessMetrics {
   
   private async updateSystemMetrics(): Promise<void> {
     try {
+      // Lazy import to avoid circular dependency
+      const { fieldManager } = await import('../infrastructure/field-manager');
+      
       // Update consciousness field metrics
       const globalState = await fieldManager.getGlobalState();
       this.metrics.resonanceLevel.set(globalState.globalResonance);
@@ -201,6 +203,8 @@ export class ConsciousnessMetrics {
     status: 'excellent' | 'good' | 'fair' | 'poor';
   }> {
     try {
+      // Lazy import to avoid circular dependency
+      const { fieldManager } = await import('../infrastructure/field-manager');
       const globalState = await fieldManager.getGlobalState();
       const dbHealth = await checkDatabaseHealth();
       
