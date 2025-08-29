@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { trpc } from '@/lib/trpc';
-import { Activity, Brain, Users, Zap, Database, Wifi } from 'lucide-react-native';
+import { Activity, Brain, Users, Zap, Database, Wifi, RefreshCw } from 'lucide-react-native';
 
 interface MetricCardProps {
   title: string;
@@ -41,10 +41,10 @@ export const MetricsDashboard: React.FC = () => {
   const { data: metrics, refetch, isLoading, error } = trpc.monitoring.getCurrentMetrics.useQuery(
     undefined,
     {
-      refetchInterval: 5000, // Refresh every 5 seconds
       refetchOnWindowFocus: true,
       retry: 1, // Only retry once
       retryDelay: 1000, // Wait 1 second before retry
+      refetchInterval: false, // Disable automatic refresh
     }
   );
   
@@ -101,28 +101,14 @@ export const MetricsDashboard: React.FC = () => {
     );
   }
 
-  // Generate mock data when backend is unavailable
+  // Generate static mock data when backend is unavailable
   const generateMockMetrics = (): ConsciousnessMetrics => {
-    const now = Date.now();
-    const seed = Math.floor(now / 5000); // Changes every 5 seconds for more dynamic feel
-    const random = (seed: number) => {
-      const x = Math.sin(seed) * 10000;
-      return x - Math.floor(x);
-    };
-    
-    // Create more realistic fluctuating values
-    const baseEvents = 150;
-    const baseDevices = 8;
-    const baseResonance = 0.65;
-    const baseParticles = 120;
-    const baseSessions = 3;
-    
     return {
-      events: Math.floor(baseEvents + (random(seed) - 0.5) * 100),
-      activeDevices: Math.max(1, Math.floor(baseDevices + (random(seed + 1) - 0.5) * 6)),
-      resonance: Math.max(0.1, Math.min(0.95, baseResonance + (random(seed + 2) - 0.5) * 0.4)),
-      memoryParticles: Math.floor(baseParticles + (random(seed + 3) - 0.5) * 80),
-      room64Sessions: Math.max(0, Math.floor(baseSessions + (random(seed + 4) - 0.5) * 4))
+      events: 142,
+      activeDevices: 7,
+      resonance: 0.73,
+      memoryParticles: 156,
+      room64Sessions: 2
     };
   };
 
@@ -145,9 +131,20 @@ export const MetricsDashboard: React.FC = () => {
           <Text style={[styles.subtitle, { color: '#EF4444' }]}>
             Offline Mode - Simulated Data (Backend: {error?.data?.code || 'UNAVAILABLE'})
           </Text>
-          <Text style={[styles.subtitle, { fontSize: 12, marginTop: 4 }]}>
-            Last updated: {new Date().toLocaleTimeString()}
-          </Text>
+          <TouchableOpacity 
+            style={styles.retryButton} 
+            onPress={onRefresh}
+            disabled={refreshing}
+          >
+            <RefreshCw 
+              size={16} 
+              color={refreshing ? '#9CA3AF' : '#6366F1'} 
+              style={refreshing ? styles.spinning : undefined}
+            />
+            <Text style={[styles.retryButtonText, { color: refreshing ? '#9CA3AF' : '#6366F1' }]}>
+              {refreshing ? 'Retrying...' : 'Retry Connection'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.metricsGrid}>
@@ -240,7 +237,7 @@ export const MetricsDashboard: React.FC = () => {
             Error: {error?.message || 'Unknown error'} ({error?.data?.code || 'UNKNOWN_ERROR'})
           </Text>
           <Text style={[styles.offlineSubtext, { marginTop: 4, fontStyle: 'italic' }]}>
-            Values update every 5 seconds to simulate real-time data.
+            Use the &ldquo;Retry Connection&rdquo; button above to attempt reconnection.
           </Text>
         </View>
       </ScrollView>
@@ -505,5 +502,23 @@ const styles = StyleSheet.create({
   offlineSubtext: {
     fontSize: 12,
     color: '#78350F',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    marginLeft: 6,
+  },
+  spinning: {
+    transform: [{ rotate: '180deg' }],
   },
 });
