@@ -1,5 +1,5 @@
 import { publicProcedure } from '../../../create-context';
-import { consciousnessMetrics } from '../../../monitoring/consciousness-metrics';
+import { consciousnessMetrics } from '../../../../monitoring/consciousness-metrics';
 import { z } from 'zod';
 
 export const metricsHealthProcedure = publicProcedure
