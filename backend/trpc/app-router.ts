@@ -9,6 +9,9 @@ import { entanglementProcedure } from "./routes/consciousness/entanglement/route
 import { room64Procedure } from "./routes/consciousness/room64/route";
 import { archaeologyProcedure } from "./routes/consciousness/archaeology/route";
 import { healthProcedure } from "./routes/system/health/route";
+import { authenticateDeviceProcedure } from "./routes/auth/authenticate-device/route";
+import { verifyTokenProcedure } from "./routes/auth/verify-token/route";
+import { getActiveDevicesProcedure } from "./routes/auth/get-active-devices/route";
 
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
@@ -28,6 +31,11 @@ export const appRouter = createTRPCRouter({
   }),
   system: createTRPCRouter({
     health: healthProcedure,
+  }),
+  auth: createTRPCRouter({
+    authenticateDevice: authenticateDeviceProcedure,
+    verifyToken: verifyTokenProcedure,
+    getActiveDevices: getActiveDevicesProcedure,
   }),
 });
 

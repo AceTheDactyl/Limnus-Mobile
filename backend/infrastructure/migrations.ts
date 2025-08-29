@@ -29,6 +29,7 @@ export class MigrationRunner {
       await this.runMigration('002_add_indexes', this.migration002AddIndexes.bind(this));
       await this.runMigration('003_add_constraints', this.migration003AddConstraints.bind(this));
       await this.runMigration('004_initialize_global_state', this.migration004InitializeGlobalState.bind(this));
+      await this.runMigration('005_add_device_sessions', this.migration005AddDeviceSessions.bind(this));
       
       console.log('✅ All migrations completed successfully');
       return { success: true };
@@ -131,6 +132,28 @@ export class MigrationRunner {
         last_sync TIMESTAMP DEFAULT NOW()
       )
     `);
+  }
+  
+  private async migration005AddDeviceSessions(): Promise<void> {
+    // Create device_sessions table for authentication
+    await db!.execute(sql`
+      CREATE TABLE IF NOT EXISTS device_sessions (
+        id SERIAL PRIMARY KEY,
+        device_id VARCHAR(255) NOT NULL UNIQUE,
+        token VARCHAR(1000) NOT NULL,
+        fingerprint VARCHAR(64) NOT NULL,
+        platform VARCHAR(20) NOT NULL,
+        capabilities JSONB DEFAULT '{}'::jsonb,
+        last_seen TIMESTAMP DEFAULT NOW(),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // Add indexes for device sessions
+    await db!.execute(sql`CREATE INDEX IF NOT EXISTS idx_device_sessions_device_id ON device_sessions(device_id)`);
+    await db!.execute(sql`CREATE INDEX IF NOT EXISTS idx_device_sessions_platform ON device_sessions(platform)`);
+    await db!.execute(sql`CREATE INDEX IF NOT EXISTS idx_device_sessions_last_seen ON device_sessions(last_seen DESC)`);
   }
   
   private async migration002AddIndexes(): Promise<void> {
@@ -240,10 +263,10 @@ export class MigrationRunner {
       const tables = await db.execute(sql`
         SELECT table_name FROM information_schema.tables 
         WHERE table_schema = 'public' 
-        AND table_name IN ('consciousness_states', 'consciousness_events', 'room64_sessions', 'entanglements')
+        AND table_name IN ('consciousness_states', 'consciousness_events', 'room64_sessions', 'entanglements', 'device_sessions')
       `);
       
-      const expectedTables = ['consciousness_states', 'consciousness_events', 'room64_sessions', 'entanglements'];
+      const expectedTables = ['consciousness_states', 'consciousness_events', 'room64_sessions', 'entanglements', 'device_sessions'];
       const existingTables = tables.map((t: any) => t.table_name);
       
       for (const table of expectedTables) {
