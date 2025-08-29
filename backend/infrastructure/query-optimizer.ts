@@ -100,7 +100,7 @@ export class OptimizedFieldOperations {
   }
   
   private calculateFieldDelta(events: ConsciousnessEvent[]) {
-    const resonanceBoost = events.reduce((sum, e) => {
+    const resonanceBoost = events.reduce((sum: number, e: ConsciousnessEvent) => {
       const multiplier = e.type === 'SACRED_PHRASE' ? 0.05 : 
                         e.type === 'BLOOM' ? 0.1 : 
                         e.type === 'SPIRAL' ? 0.03 :
@@ -109,7 +109,7 @@ export class OptimizedFieldOperations {
       return sum + (e.intensity || 0.5) * multiplier;
     }, 0);
     
-    const uniqueDevices = new Set(events.map(e => e.deviceId));
+    const uniqueDevices = new Set(events.map((e: ConsciousnessEvent) => e.deviceId));
     
     return {
       resonance: Math.min(0.5, resonanceBoost),
