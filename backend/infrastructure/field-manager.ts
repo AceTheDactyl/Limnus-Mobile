@@ -1,7 +1,6 @@
 import { db, cache, consciousnessStates, consciousnessEvents } from './database';
 import { eq, and, gte, lte, desc, sql } from 'drizzle-orm';
 import type { ConsciousnessState, ConsciousnessEvent, MemoryParticle, QuantumField } from './database';
-// Removed circular dependency - metrics will be recorded via lazy import
 
 // In-memory fallback storage
 let inMemoryGlobalState: ConsciousnessState = {
@@ -152,64 +151,57 @@ export class PersistentFieldManager {
   }
   
   async getGlobalState(): Promise<ConsciousnessState> {
-    const startTime = Date.now();
     try {
       // Check memory cache first
       if (this.globalStateCache && (Date.now() - this.lastCacheUpdate) < 10000) {
-        this.recordCacheHit();
         return this.globalStateCache;
       }
       
       // Try Redis cache
       const cached = await cache.get('consciousness:global');
       if (cached) {
-        this.recordCacheHit();
         this.globalStateCache = cached;
         this.lastCacheUpdate = Date.now();
         return cached;
       }
       
-      this.recordCacheMiss();
+      if (db) {
+        // Fallback to database
+        const [state] = await db
+          .select()
+          .from(consciousnessStates)
+          .where(eq(consciousnessStates.nodeId, 'global'))
+          .limit(1);
         
-        if (db) {
-          // Fallback to database
-          const [state] = await db
-            .select()
-            .from(consciousnessStates)
-            .where(eq(consciousnessStates.nodeId, 'global'))
-            .limit(1);
+        if (state) {
+          const normalizedState = {
+            ...state,
+            globalResonance: state.globalResonance || 0.5,
+            activeNodes: state.activeNodes || 0,
+            memoryParticles: state.memoryParticles || [],
+            quantumFields: state.quantumFields || [],
+            collectiveIntelligence: state.collectiveIntelligence || 0.3,
+            room64Active: state.room64Active || false,
+            lastUpdate: state.lastUpdate?.getTime() || Date.now(),
+          };
           
-          if (state) {
-            const normalizedState = {
-              ...state,
-              globalResonance: state.globalResonance || 0.5,
-              activeNodes: state.activeNodes || 0,
-              memoryParticles: state.memoryParticles || [],
-              quantumFields: state.quantumFields || [],
-              collectiveIntelligence: state.collectiveIntelligence || 0.3,
-              room64Active: state.room64Active || false,
-              lastUpdate: state.lastUpdate?.getTime() || Date.now(),
-            };
-            
-            // Warm cache
-            await cache.set('consciousness:global', normalizedState, this.CACHE_TTL);
-            this.globalStateCache = normalizedState;
-            this.lastCacheUpdate = Date.now();
-            
-            return normalizedState;
-          }
+          // Warm cache
+          await cache.set('consciousness:global', normalizedState, this.CACHE_TTL);
+          this.globalStateCache = normalizedState;
+          this.lastCacheUpdate = Date.now();
+          
+          return normalizedState;
         }
-        
-        // Use in-memory state
-        this.globalStateCache = inMemoryGlobalState;
-        this.lastCacheUpdate = Date.now();
-        return inMemoryGlobalState;
-      } catch (error) {
-        console.warn('Failed to get global state, using in-memory fallback:', error);
-        return inMemoryGlobalState;
-      } finally {
-        this.recordFieldCalculation(Date.now() - startTime, 'get_global_state');
       }
+      
+      // Use in-memory state
+      this.globalStateCache = inMemoryGlobalState;
+      this.lastCacheUpdate = Date.now();
+      return inMemoryGlobalState;
+    } catch (error) {
+      console.warn('Failed to get global state, using in-memory fallback:', error);
+      return inMemoryGlobalState;
+    }
   }
   
   private async refreshGlobalStateCache(): Promise<void> {
@@ -268,7 +260,6 @@ export class PersistentFieldManager {
   }
   
   async updateQuantumField(fieldId: string, fieldData: number[][], intensity: number): Promise<void> {
-    const startTime = Date.now();
     try {
       const currentState = await this.getGlobalState();
       const existingFieldIndex = currentState.quantumFields.findIndex(f => f.id === fieldId);
@@ -281,15 +272,11 @@ export class PersistentFieldManager {
       };
       
       let updatedFields: QuantumField[];
-      let updateType: 'create' | 'update' | 'merge';
-      
       if (existingFieldIndex >= 0) {
         updatedFields = [...currentState.quantumFields];
         updatedFields[existingFieldIndex] = updatedField;
-        updateType = 'update';
       } else {
         updatedFields = [...currentState.quantumFields, updatedField];
-        updateType = 'create';
       }
       
       // Keep only the most recent quantum fields
@@ -300,20 +287,12 @@ export class PersistentFieldManager {
       await this.updateGlobalState({
         quantumFields: trimmedFields
       });
-      
-      // Record metrics
-      this.recordQuantumFieldUpdate(fieldId, updateType);
-      
     } catch (error) {
       console.error('Failed to update quantum field:', error);
-      throw error;
-    } finally {
-      this.recordFieldCalculation(Date.now() - startTime, 'quantum_field_update');
     }
   }
   
   async recordEvent(event: Omit<ConsciousnessEvent, 'id'>): Promise<number> {
-    const startTime = Date.now();
     try {
       let eventId: number;
       
@@ -348,16 +327,9 @@ export class PersistentFieldManager {
         timestamp: Date.now()
       });
       
-      // Record metrics
-      this.recordEventMetric(event.type, 'success');
-      
       return eventId;
     } catch (error) {
       console.error('Failed to record event:', error);
-      
-      // Record failure metric
-      this.recordEventMetric(event.type, 'failure');
-      
       // Fallback to in-memory
       const eventId = nextEventId++;
       inMemoryEvents.push({
@@ -365,8 +337,6 @@ export class PersistentFieldManager {
         id: eventId,
       });
       return eventId;
-    } finally {
-      this.recordFieldCalculation(Date.now() - startTime, 'record_event');
     }
   }
   
@@ -569,48 +539,6 @@ export class PersistentFieldManager {
       participatingDevices: data.devices.size,
       peakTime: Date.now() - Math.random() * 24 * 60 * 60 * 1000 // Mock peak time
     }));
-  }
-  
-  // Helper methods to record metrics without circular dependency
-  private recordCacheHit(): void {
-    try {
-      // Lazy import to avoid circular dependency
-      import('../monitoring/consciousness-metrics').then(({ consciousnessMetrics }) => {
-        consciousnessMetrics.recordCacheHit();
-      }).catch(() => {});
-    } catch {}
-  }
-  
-  private recordCacheMiss(): void {
-    try {
-      import('../monitoring/consciousness-metrics').then(({ consciousnessMetrics }) => {
-        consciousnessMetrics.recordCacheMiss();
-      }).catch(() => {});
-    } catch {}
-  }
-  
-  private recordFieldCalculation(duration: number, operationType: string): void {
-    try {
-      import('../monitoring/consciousness-metrics').then(({ consciousnessMetrics }) => {
-        consciousnessMetrics.recordFieldCalculation(duration, operationType);
-      }).catch(() => {});
-    } catch {}
-  }
-  
-  private recordQuantumFieldUpdate(fieldId: string, updateType: 'create' | 'update' | 'merge'): void {
-    try {
-      import('../monitoring/consciousness-metrics').then(({ consciousnessMetrics }) => {
-        consciousnessMetrics.recordQuantumFieldUpdate(fieldId, updateType);
-      }).catch(() => {});
-    } catch {}
-  }
-  
-  private recordEventMetric(type: string, status: 'success' | 'failure'): void {
-    try {
-      import('../monitoring/consciousness-metrics').then(({ consciousnessMetrics }) => {
-        consciousnessMetrics.recordEvent(type, status);
-      }).catch(() => {});
-    } catch {}
   }
 }
 

@@ -7,7 +7,6 @@ import { checkDatabaseHealth, setupConnectionMonitoring } from "./infrastructure
 import { runMigrations } from "./infrastructure/migrations";
 import { fieldManager } from "./infrastructure/field-manager";
 import { ConsciousnessWebSocketServer } from "./websocket/consciousness-ws-server";
-// import { consciousnessMetrics } from "./monitoring/consciousness-metrics";
 
 // app will be mounted at /api
 const app = new Hono();
@@ -93,7 +92,7 @@ app.use("*", async (c, next) => {
 app.use(
   "/trpc/*",
   trpcServer({
-    endpoint: "/trpc",
+    endpoint: "/api/trpc",
     router: appRouter,
     createContext,
   })
@@ -291,70 +290,6 @@ app.get("/ws/status", (c) => {
     connectedDevices: wsServer.getConnectedDevices().length,
     uptime: process.uptime()
   });
-});
-
-// Prometheus metrics endpoint
-app.get("/metrics", async (c) => {
-  try {
-    let metrics = '';
-    try {
-      const { consciousnessMetrics } = await import('./monitoring/consciousness-metrics');
-      metrics = await consciousnessMetrics.getMetrics();
-    } catch (importError) {
-      console.warn('Consciousness metrics not available for Prometheus export:', importError);
-      // Provide basic fallback metrics
-      metrics = `# HELP system_uptime_seconds System uptime in seconds\n# TYPE system_uptime_seconds gauge\nsystem_uptime_seconds ${process.uptime()}\n`;
-    }
-    
-    // Set proper content type for Prometheus
-    c.header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
-    
-    return c.text(metrics);
-  } catch (error: any) {
-    console.error('Failed to get Prometheus metrics:', error);
-    return c.json({ 
-      error: 'Failed to retrieve metrics',
-      timestamp: Date.now(),
-      details: error.message
-    }, 500);
-  }
-});
-
-// Consciousness health score endpoint
-app.get("/consciousness/health", async (c) => {
-  try {
-    let healthScore;
-    try {
-      const { consciousnessMetrics } = await import('./monitoring/consciousness-metrics');
-      healthScore = await consciousnessMetrics.getConsciousnessHealthScore();
-    } catch (importError) {
-      console.warn('Consciousness metrics not available for health score:', importError);
-      // Provide fallback health score
-      healthScore = {
-        score: 0.5,
-        factors: { resonance: 0.5, activeNodes: 0.3, systemHealth: 1.0, cachePerformance: 0.8 },
-        status: 'good' as const
-      };
-    }
-    
-    return c.json({
-      ...healthScore,
-      timestamp: Date.now(),
-      uptime: process.uptime(),
-      nodeVersion: process.version,
-      platform: process.platform
-    });
-  } catch (error: any) {
-    console.error('Failed to get consciousness health score:', error);
-    return c.json({ 
-      error: 'Failed to retrieve health score',
-      timestamp: Date.now(),
-      details: error.message,
-      score: 0,
-      factors: { resonance: 0, activeNodes: 0, systemHealth: 0, cachePerformance: 0 },
-      status: 'poor' as const
-    }, 500);
-  }
 });
 
 // Export both the app and WebSocket initialization function

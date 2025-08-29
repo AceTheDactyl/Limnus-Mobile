@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { publicProcedure } from "../../../create-context";
-import { fieldManager } from "../../../infrastructure/field-manager";
-import { db, room64Sessions } from "../../../infrastructure/database";
+import { publicProcedure } from "@/backend/trpc/create-context";
+import { fieldManager } from "@/backend/infrastructure/field-manager";
+import { db, room64Sessions } from "@/backend/infrastructure/database";
 import { eq } from "drizzle-orm";
 
 const room64Schema = z.object({

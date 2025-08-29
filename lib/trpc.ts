@@ -9,7 +9,7 @@ export const trpc = createTRPCReact<AppRouter>();
 const getBaseUrl = () => {
   // Check for environment variable first
   if (process.env.EXPO_PUBLIC_RORK_API_BASE_URL) {
-    console.log('🔗 Using configured base URL:', process.env.EXPO_PUBLIC_RORK_API_BASE_URL);
+    console.log('Using configured base URL:', process.env.EXPO_PUBLIC_RORK_API_BASE_URL);
     return process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
   }
 
@@ -17,26 +17,22 @@ const getBaseUrl = () => {
   if (Platform.OS === 'web') {
     // On web, use the current origin
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-    console.log('🌐 Web platform detected, using:', baseUrl);
+    console.log('Web platform detected, using:', baseUrl);
     return baseUrl;
   } else {
     // On mobile, try common development URLs
     // First try the Expo tunnel URL if available
     if (process.env.EXPO_PUBLIC_DEV_URL) {
-      console.log('📱 Using Expo dev URL:', process.env.EXPO_PUBLIC_DEV_URL);
+      console.log('Using Expo dev URL:', process.env.EXPO_PUBLIC_DEV_URL);
       return process.env.EXPO_PUBLIC_DEV_URL;
     }
     
     // Fallback to localhost for simulator/emulator
     const fallbackUrl = Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
-    console.log('📱 Mobile platform detected, using fallback:', fallbackUrl);
+    console.log('Mobile platform detected, using fallback:', fallbackUrl);
     return fallbackUrl;
   }
 };
-
-const baseUrl = getBaseUrl();
-const trpcUrl = `${baseUrl}/api/trpc`;
-console.log('🚀 tRPC client initialized with URL:', trpcUrl);
 
 export const trpcClient = trpc.createClient({
   links: [
@@ -117,14 +113,7 @@ export const trpcClient = trpc.createClient({
               if (isNetworkError || isAbortError) {
                 console.error('All connection attempts failed. Backend server is not accessible.');
                 // Don't throw error, return a mock response to prevent app crash
-                console.warn('🔌 Backend server is not running. Please start the backend server.');
-                console.warn('💡 To start the backend: cd to project root and run: node backend/start-server.js');
-                return new Response(JSON.stringify({ 
-                  error: 'Backend server not running', 
-                  offline: true,
-                  message: 'Please start the backend server to enable full functionality',
-                  instructions: 'Run: node backend/start-server.js'
-                }), {
+                return new Response(JSON.stringify({ error: 'Backend unavailable', offline: true }), {
                   status: 503,
                   headers: { 'Content-Type': 'application/json' }
                 });

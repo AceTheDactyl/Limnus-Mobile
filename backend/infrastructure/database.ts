@@ -1,6 +1,5 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { pgTable, serial, real, timestamp, jsonb, integer, boolean, varchar } from 'drizzle-orm/pg-core';
-import { eq, desc, sql } from 'drizzle-orm';
 import postgres from 'postgres';
 import Redis from 'ioredis';
 
@@ -90,17 +89,6 @@ export const entanglements = pgTable('entanglements', {
   status: varchar('status', { length: 20 }).default('active'),
   established: timestamp('established').defaultNow(),
   lastSync: timestamp('last_sync').defaultNow(),
-});
-
-export const deviceSessions = pgTable('device_sessions', {
-  id: serial('id').primaryKey(),
-  deviceId: varchar('device_id', { length: 255 }).notNull().unique(),
-  token: varchar('token', { length: 1000 }).notNull(),
-  fingerprint: varchar('fingerprint', { length: 255 }).notNull(),
-  platform: varchar('platform', { length: 50 }).notNull(),
-  capabilities: jsonb('capabilities').$type<Record<string, boolean>>().default({}),
-  lastSeen: timestamp('last_seen').defaultNow(),
-  createdAt: timestamp('created_at').defaultNow(),
 });
 
 // Database connection with enhanced connection pooling

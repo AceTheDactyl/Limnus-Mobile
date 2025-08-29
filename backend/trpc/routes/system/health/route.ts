@@ -1,8 +1,8 @@
 
-import { publicProcedure } from "../../../create-context";
-import { checkDatabaseHealth } from "../../../infrastructure/database";
-import { fieldManager } from "../../../infrastructure/field-manager";
-import { migrationRunner } from "../../../infrastructure/migrations";
+import { publicProcedure } from "@/backend/trpc/create-context";
+import { checkDatabaseHealth } from "@/backend/infrastructure/database";
+import { fieldManager } from "@/backend/infrastructure/field-manager";
+import { migrationRunner } from "@/backend/infrastructure/migrations";
 
 export const healthProcedure = publicProcedure
   .query(async () => {
