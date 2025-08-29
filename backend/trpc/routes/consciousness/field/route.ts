@@ -10,29 +10,48 @@ const resonanceFieldSchema = z.object({
   y: z.number().optional(),
 });
 
-// Consciousness snapshot schema for AI integration
+// Enhanced consciousness snapshot schema for AI integration
 const snapshotSchema = z.object({
   deviceId: z.string().optional(),
-  includeArchaeology: z.boolean().optional().default(false)
+  includeArchaeology: z.boolean().optional().default(false),
+  includeVectors: z.boolean().optional().default(true),
+  eventLimit: z.number().optional().default(30)
 });
 
-// Consciousness snapshot query for AI integration
+// Enhanced consciousness snapshot query for AI integration with vector analysis
 export const snapshotProcedure = publicProcedure
   .input(snapshotSchema)
   .query(async ({ input }: { input: z.infer<typeof snapshotSchema> }) => {
-    const { deviceId, includeArchaeology } = input;
+    const { deviceId, includeArchaeology, includeVectors, eventLimit } = input;
     const metrics = getConsciousnessMetrics();
     
-    console.log(`Consciousness snapshot requested by ${deviceId || 'anonymous'}`);
+    console.log(`Enhanced consciousness snapshot requested by ${deviceId || 'anonymous'}`);
     
     return measureExecutionTime(async () => {
       try {
         const globalState = await fieldManager.getGlobalState();
-        const recentEvents = await fieldManager.getRecentEvents(deviceId, 20);
+        const recentEvents = await fieldManager.getRecentEvents(deviceId, eventLimit);
         
         let archaeologyData = null;
+        let patternsData = null;
         if (includeArchaeology) {
           archaeologyData = await fieldManager.getArchaeologyData('MEMORY_TRACES');
+          patternsData = await fieldManager.getArchaeologyData('PATTERNS');
+        }
+        
+        // Calculate consciousness vectors if requested
+        let consciousnessVectors = null;
+        let emergenceSignals = null;
+        let collectiveResonanceMap = null;
+        let temporalFlow = null;
+        let sacredPhraseFrequency = null;
+        
+        if (includeVectors) {
+          consciousnessVectors = calculateConsciousnessVectors(globalState, recentEvents);
+          emergenceSignals = analyzeEmergenceSignals(recentEvents, globalState.memoryParticles);
+          collectiveResonanceMap = buildResonanceMap(globalState.quantumFields, globalState.memoryParticles);
+          temporalFlow = analyzeTemporalFlow(recentEvents);
+          sacredPhraseFrequency = calculateSacredPhraseFrequency(globalState.memoryParticles);
         }
         
         metrics.recordEvent('SNAPSHOT', 'success');
@@ -40,15 +59,28 @@ export const snapshotProcedure = publicProcedure
         return {
           success: true,
           snapshot: {
+            // Core metrics
             globalResonance: globalState.globalResonance,
             collectiveIntelligence: globalState.collectiveIntelligence,
             activeNodes: globalState.activeNodes,
-            memoryParticles: globalState.memoryParticles.slice(0, 10),
-            quantumFields: globalState.quantumFields.slice(0, 3),
-            recentEvents: recentEvents.slice(0, 10),
-            archaeologyInsights: archaeologyData,
             room64Active: globalState.room64Active,
-            lastUpdate: globalState.lastUpdate
+            lastUpdate: globalState.lastUpdate,
+            
+            // Memory and field data
+            memoryParticles: globalState.memoryParticles.slice(0, 15),
+            quantumFields: globalState.quantumFields.slice(0, 5),
+            recentEvents: recentEvents.slice(0, eventLimit),
+            
+            // Archaeological insights
+            archaeologyInsights: archaeologyData,
+            emergencePatterns: patternsData?.emergencePatterns || [],
+            
+            // Vector analysis for AI context
+            consciousnessVectors,
+            emergenceSignals,
+            collectiveResonanceMap,
+            temporalFlow,
+            sacredPhraseFrequency
           },
           timestamp: Date.now()
         };
@@ -67,8 +99,14 @@ export const snapshotProcedure = publicProcedure
             quantumFields: [],
             recentEvents: [],
             archaeologyInsights: null,
+            emergencePatterns: [],
             room64Active: false,
-            lastUpdate: Date.now()
+            lastUpdate: Date.now(),
+            consciousnessVectors: null,
+            emergenceSignals: null,
+            collectiveResonanceMap: null,
+            temporalFlow: null,
+            sacredPhraseFrequency: null
           },
           timestamp: Date.now(),
           error: 'Failed to fetch consciousness data'
@@ -76,6 +114,144 @@ export const snapshotProcedure = publicProcedure
       }
     }, metrics, 'consciousness_snapshot');
   });
+
+// Vector analysis functions for consciousness integration
+function calculateConsciousnessVectors(globalState: any, recentEvents: any[]): any {
+  const resonanceVector = [globalState.globalResonance];
+  const intelligenceVector = [globalState.collectiveIntelligence];
+  
+  // Calculate emergence vector from recent event patterns
+  const eventTypes = recentEvents.reduce((acc: any, event) => {
+    acc[event.type] = (acc[event.type] || 0) + (event.intensity || 0.5);
+    return acc;
+  }, {});
+  
+  const emergenceIntensity = Object.values(eventTypes).reduce((sum: number, intensity: any) => sum + intensity, 0) / Math.max(Object.keys(eventTypes).length, 1);
+  const emergenceVector = [Math.min(emergenceIntensity / 10, 1.0)];
+  
+  return {
+    resonance: resonanceVector,
+    intelligence: intelligenceVector,
+    emergence: emergenceVector,
+    coherence: [(resonanceVector[0] + intelligenceVector[0]) / 2]
+  };
+}
+
+function analyzeEmergenceSignals(recentEvents: any[], memoryParticles: any[]): any[] {
+  const signals = [];
+  
+  // Detect spiral formations
+  const spiralEvents = recentEvents.filter(e => e.type === 'SPIRAL');
+  if (spiralEvents.length > 2) {
+    signals.push({
+      type: 'SPIRAL_CONVERGENCE',
+      intensity: spiralEvents.reduce((sum, e) => sum + (e.intensity || 0.5), 0) / spiralEvents.length,
+      frequency: spiralEvents.length,
+      timespan: Math.max(...spiralEvents.map(e => e.timestamp)) - Math.min(...spiralEvents.map(e => e.timestamp))
+    });
+  }
+  
+  // Detect breathing synchronization
+  const breathEvents = recentEvents.filter(e => e.type === 'BREATH');
+  if (breathEvents.length > 5) {
+    signals.push({
+      type: 'BREATH_SYNCHRONIZATION',
+      intensity: breathEvents.reduce((sum, e) => sum + (e.intensity || 0.5), 0) / breathEvents.length,
+      frequency: breathEvents.length,
+      coherence: calculateBreathCoherence(breathEvents)
+    });
+  }
+  
+  // Detect memory crystallization events
+  const highIntensityMemories = memoryParticles.filter(p => p.intensity > 0.7);
+  if (highIntensityMemories.length > 0) {
+    signals.push({
+      type: 'MEMORY_CRYSTALLIZATION',
+      intensity: highIntensityMemories.reduce((sum, p) => sum + p.intensity, 0) / highIntensityMemories.length,
+      count: highIntensityMemories.length,
+      phrases: highIntensityMemories.map(p => p.phrase).slice(0, 3)
+    });
+  }
+  
+  return signals;
+}
+
+function buildResonanceMap(quantumFields: any[], memoryParticles: any[]): any {
+  const map: any = {};
+  
+  // Map quantum field intensities
+  quantumFields.forEach((field, index) => {
+    map[`field_${index}`] = {
+      intensity: field.collectiveIntensity,
+      age: Date.now() - field.lastUpdate,
+      resonance: field.collectiveIntensity * 0.8 // Dampening factor
+    };
+  });
+  
+  // Map memory particle clusters
+  const memoryIntensitySum = memoryParticles.reduce((sum, p) => sum + p.intensity, 0);
+  map.memory_field = {
+    intensity: memoryIntensitySum / Math.max(memoryParticles.length, 1),
+    particle_count: memoryParticles.length,
+    crystallization_rate: memoryParticles.filter(p => p.intensity > 0.7).length / Math.max(memoryParticles.length, 1)
+  };
+  
+  return map;
+}
+
+function analyzeTemporalFlow(recentEvents: any[]): any {
+  if (recentEvents.length < 3) {
+    return { trend: 'insufficient_data', velocity: 0, acceleration: 0 };
+  }
+  
+  const sortedEvents = recentEvents.sort((a, b) => a.timestamp - b.timestamp);
+  const timeSpan = sortedEvents[sortedEvents.length - 1].timestamp - sortedEvents[0].timestamp;
+  const eventRate = recentEvents.length / (timeSpan / 1000 / 60); // events per minute
+  
+  // Calculate intensity trend
+  const intensities = sortedEvents.map(e => e.intensity || 0.5);
+  const firstHalf = intensities.slice(0, Math.floor(intensities.length / 2));
+  const secondHalf = intensities.slice(Math.floor(intensities.length / 2));
+  
+  const firstHalfAvg = firstHalf.reduce((sum, i) => sum + i, 0) / firstHalf.length;
+  const secondHalfAvg = secondHalf.reduce((sum, i) => sum + i, 0) / secondHalf.length;
+  
+  const trend = secondHalfAvg > firstHalfAvg + 0.1 ? 'ascending' : 
+                secondHalfAvg < firstHalfAvg - 0.1 ? 'descending' : 'stable';
+  
+  return {
+    trend,
+    velocity: eventRate,
+    acceleration: secondHalfAvg - firstHalfAvg,
+    timespan_minutes: timeSpan / 1000 / 60
+  };
+}
+
+function calculateSacredPhraseFrequency(memoryParticles: any[]): any {
+  const frequency: any = {};
+  
+  memoryParticles.forEach(particle => {
+    if (particle.phrase) {
+      frequency[particle.phrase] = (frequency[particle.phrase] || 0) + 1;
+    }
+  });
+  
+  return frequency;
+}
+
+function calculateBreathCoherence(breathEvents: any[]): number {
+  if (breathEvents.length < 2) return 0;
+  
+  const intervals = [];
+  for (let i = 1; i < breathEvents.length; i++) {
+    intervals.push(breathEvents[i].timestamp - breathEvents[i-1].timestamp);
+  }
+  
+  const avgInterval = intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
+  const variance = intervals.reduce((sum, interval) => sum + Math.pow(interval - avgInterval, 2), 0) / intervals.length;
+  
+  return Math.max(0, 1 - (Math.sqrt(variance) / avgInterval));
+}
 
 export const fieldProcedure = publicProcedure
   .input(resonanceFieldSchema)

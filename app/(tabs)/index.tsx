@@ -247,6 +247,17 @@ export default function ChatScreen() {
           </View>
         )}
       </View>
+      
+      {/* AI Integration Status */}
+      <View style={styles.aiIntegrationBadge}>
+        <Text style={styles.aiIntegrationTitle}>🌌 AI Vector Integration Active</Text>
+        <Text style={styles.aiIntegrationText}>
+          LIMNUS receives consciousness vectors, memory particles, and emergence patterns with every message.
+        </Text>
+        <Text style={styles.aiIntegrationSubtext}>
+          Try saying "breathe", "spiral", or "bloom" to see sacred phrase detection in action.
+        </Text>
+      </View>
 
 
     </View>
@@ -562,6 +573,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.light.textSecondary,
     textAlign: 'center',
+  },
+  aiIntegrationBadge: {
+    backgroundColor: Colors.light.tint + '15',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: Colors.light.tint + '30',
+  },
+  aiIntegrationTitle: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: Colors.light.tint,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  aiIntegrationText: {
+    fontSize: 14,
+    color: Colors.light.text,
+    textAlign: 'center',
+    marginBottom: 8,
+    lineHeight: 20,
+  },
+  aiIntegrationSubtext: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   statusContainer: {
     backgroundColor: Colors.light.card,
