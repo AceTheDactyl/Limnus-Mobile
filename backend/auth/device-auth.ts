@@ -177,8 +177,8 @@ export class DeviceAuthManager {
         .orderBy(desc(consciousnessEvents.timestamp))
         .limit(100);
       
-      const sacredPhrases = recentEvents.filter((e: typeof recentEvents[0]) => e.type === 'SACRED_PHRASE').length;
-      const blooms = recentEvents.filter((e: typeof recentEvents[0]) => e.type === 'BLOOM').length;
+      const sacredPhrases = recentEvents.filter((e) => e.type === 'SACRED_PHRASE').length;
+      const blooms = recentEvents.filter((e) => e.type === 'BLOOM').length;
       const totalEvents = recentEvents.length;
       
       // Calculate consciousness level based on activity patterns
