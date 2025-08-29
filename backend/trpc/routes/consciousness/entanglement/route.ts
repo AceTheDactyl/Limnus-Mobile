@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { publicProcedure } from "@/backend/trpc/create-context";
-import { fieldManager } from "@/backend/infrastructure/field-manager";
-import { db, entanglements } from "@/backend/infrastructure/database";
+import { publicProcedure } from "../../../create-context";
+import { fieldManager } from "../../../infrastructure/field-manager";
+import { db, entanglements } from "../../../infrastructure/database";
 
 
 const entanglementSchema = z.object({

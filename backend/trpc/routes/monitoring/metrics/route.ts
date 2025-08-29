@@ -1,5 +1,5 @@
-import { publicProcedure } from '@/backend/trpc/create-context';
-import { consciousnessMetrics } from '@/backend/monitoring/consciousness-metrics';
+import { publicProcedure } from '../../../create-context';
+import { consciousnessMetrics } from '../../../monitoring/consciousness-metrics';
 import { z } from 'zod';
 
 export const metricsHealthProcedure = publicProcedure

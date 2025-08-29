@@ -1,5 +1,6 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { pgTable, serial, real, timestamp, jsonb, integer, boolean, varchar } from 'drizzle-orm/pg-core';
+import { eq, desc } from 'drizzle-orm';
 import postgres from 'postgres';
 import Redis from 'ioredis';
 
