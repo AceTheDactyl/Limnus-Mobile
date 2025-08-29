@@ -12,14 +12,23 @@ const getMockMetrics = () => {
   };
 };
 
+// Helper function to safely get metrics
+const getMetricsInstance = async () => {
+  try {
+    const { getConsciousnessMetrics } = await import('../../../../monitoring/consciousness-metrics');
+    return getConsciousnessMetrics();
+  } catch (error) {
+    console.warn('Failed to load consciousness metrics:', error);
+    return null;
+  }
+};
+
 export const getMetricsProcedure = publicProcedure
   .query(async () => {
     try {
-      // Try to use the real metrics, fallback to mock
-      let metrics;
-      try {
-        const { getConsciousnessMetrics } = await import('../../../../monitoring/consciousness-metrics');
-        const metricsInstance = getConsciousnessMetrics();
+      const metricsInstance = await getMetricsInstance();
+      
+      if (metricsInstance) {
         const prometheusMetrics = await metricsInstance.getMetrics();
         const currentMetrics = await metricsInstance.getCurrentMetrics();
         
@@ -28,16 +37,15 @@ export const getMetricsProcedure = publicProcedure
           summary: currentMetrics,
           timestamp: Date.now()
         };
-      } catch (metricsError) {
-        console.warn('Real metrics unavailable, using mock data:', metricsError);
-        metrics = getMockMetrics();
+      } else {
+        // Fallback to mock data
+        const mockMetrics = getMockMetrics();
+        return {
+          prometheus: 'Mock prometheus metrics data',
+          summary: mockMetrics,
+          timestamp: Date.now()
+        };
       }
-      
-      return {
-        prometheus: 'Mock prometheus metrics data',
-        summary: metrics,
-        timestamp: Date.now()
-      };
     } catch (error) {
       console.error('Error getting metrics:', error);
       return {
@@ -52,13 +60,12 @@ export const getMetricsProcedure = publicProcedure
 export const getCurrentMetricsProcedure = publicProcedure
   .query(async () => {
     try {
-      // Try to use the real metrics, fallback to mock
-      try {
-        const { getConsciousnessMetrics } = await import('../../../../monitoring/consciousness-metrics');
-        const metricsInstance = getConsciousnessMetrics();
+      const metricsInstance = await getMetricsInstance();
+      
+      if (metricsInstance) {
         return await metricsInstance.getCurrentMetrics();
-      } catch (metricsError) {
-        console.warn('Real metrics unavailable, using mock data:', metricsError);
+      } else {
+        console.warn('Metrics instance unavailable, using mock data');
         return getMockMetrics();
       }
     } catch (error) {
@@ -104,13 +111,12 @@ export const updateMetricsProcedure = publicProcedure
   }))
   .mutation(async ({ input }) => {
     try {
-      // Try to use the real metrics, fallback to mock response
-      try {
-        const { getConsciousnessMetrics } = await import('../../../../monitoring/consciousness-metrics');
-        const metrics = getConsciousnessMetrics();
-        metrics.batchUpdate(input);
-      } catch {
-        console.warn('Real metrics unavailable for update, logging input:', input);
+      const metricsInstance = await getMetricsInstance();
+      
+      if (metricsInstance) {
+        metricsInstance.batchUpdate(input);
+      } else {
+        console.warn('Metrics instance unavailable for update, logging input:', input);
       }
       
       return {

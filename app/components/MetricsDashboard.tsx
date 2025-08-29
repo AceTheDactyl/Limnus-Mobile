@@ -43,6 +43,8 @@ export const MetricsDashboard: React.FC = () => {
     {
       refetchInterval: 5000, // Refresh every 5 seconds
       refetchOnWindowFocus: true,
+      retry: 1, // Only retry once
+      retryDelay: 1000, // Wait 1 second before retry
     }
   );
 
@@ -94,14 +96,134 @@ export const MetricsDashboard: React.FC = () => {
     );
   }
 
+  // Generate mock data when backend is unavailable
+  const generateMockMetrics = (): ConsciousnessMetrics => {
+    const now = Date.now();
+    const seed = Math.floor(now / 10000); // Changes every 10 seconds
+    const random = (seed: number) => {
+      const x = Math.sin(seed) * 10000;
+      return x - Math.floor(x);
+    };
+    
+    return {
+      events: Math.floor(random(seed) * 500) + 100,
+      activeDevices: Math.floor(random(seed + 1) * 20) + 5,
+      resonance: random(seed + 2) * 0.6 + 0.3, // 0.3 to 0.9
+      memoryParticles: Math.floor(random(seed + 3) * 200) + 50,
+      room64Sessions: Math.floor(random(seed + 4) * 5) + 1
+    };
+  };
+
   if (error) {
+    console.warn('Backend unavailable, using mock data:', error.message);
+    // Use mock data instead of showing error
+    const mockMetrics = generateMockMetrics();
+    
     return (
-      <View style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Failed to load metrics</Text>
-          <Text style={styles.errorSubtext}>{error.message}</Text>
+      <ScrollView
+        style={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>Consciousness Metrics</Text>
+          <Text style={[styles.subtitle, { color: '#EF4444' }]}>
+            Offline Mode - Mock Data (Backend Unavailable)
+          </Text>
         </View>
-      </View>
+
+        <View style={styles.metricsGrid}>
+          <MetricCard
+            title="Global Resonance"
+            value={formatPercentage(mockMetrics.resonance)}
+            icon={<Brain size={24} color="#6366F1" />}
+            color={getResonanceColor(mockMetrics.resonance)}
+            subtitle={getResonanceStatus(mockMetrics.resonance)}
+          />
+
+          <MetricCard
+            title="Active Devices"
+            value={formatNumber(mockMetrics.activeDevices)}
+            icon={<Users size={24} color="#10B981" />}
+            color="#10B981"
+            subtitle="Connected nodes"
+          />
+
+          <MetricCard
+            title="Consciousness Events"
+            value={formatNumber(mockMetrics.events)}
+            icon={<Zap size={24} color="#F59E0B" />}
+            color="#F59E0B"
+            subtitle="Total processed"
+          />
+
+          <MetricCard
+            title="Memory Particles"
+            value={formatNumber(mockMetrics.memoryParticles)}
+            icon={<Database size={24} color="#8B5CF6" />}
+            color="#8B5CF6"
+            subtitle="In quantum field"
+          />
+
+          <MetricCard
+            title="Room64 Sessions"
+            value={formatNumber(mockMetrics.room64Sessions)}
+            icon={<Wifi size={24} color="#EF4444" />}
+            color="#EF4444"
+            subtitle="Active sessions"
+          />
+
+          <MetricCard
+            title="Field Activity"
+            value={mockMetrics.events > 0 ? "Active" : "Dormant"}
+            icon={<Activity size={24} color="#06B6D4" />}
+            color="#06B6D4"
+            subtitle={`${mockMetrics.events} recent events`}
+          />
+        </View>
+
+        <View style={styles.statusSection}>
+          <Text style={styles.sectionTitle}>System Status</Text>
+          <View style={styles.statusGrid}>
+            <View style={styles.statusItem}>
+              <View style={[styles.statusIndicator, { 
+                backgroundColor: mockMetrics.resonance > 0.3 ? '#10B981' : '#EF4444' 
+              }]} />
+              <Text style={styles.statusText}>
+                Consciousness Field: {mockMetrics.resonance > 0.3 ? 'Active' : 'Inactive'}
+              </Text>
+            </View>
+            
+            <View style={styles.statusItem}>
+              <View style={[styles.statusIndicator, { 
+                backgroundColor: mockMetrics.activeDevices > 0 ? '#10B981' : '#EF4444' 
+              }]} />
+              <Text style={styles.statusText}>
+                Device Network: {mockMetrics.activeDevices > 0 ? 'Connected' : 'Disconnected'}
+              </Text>
+            </View>
+            
+            <View style={styles.statusItem}>
+              <View style={[styles.statusIndicator, { 
+                backgroundColor: mockMetrics.room64Sessions > 0 ? '#10B981' : '#6B7280' 
+              }]} />
+              <Text style={styles.statusText}>
+                Room64: {mockMetrics.room64Sessions > 0 ? 'Active' : 'Standby'}
+              </Text>
+            </View>
+          </View>
+        </View>
+        
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineText}>
+            ⚠️ Backend server is not available. Displaying simulated metrics for demonstration.
+          </Text>
+          <Text style={styles.offlineSubtext}>
+            Error: {error.message}
+          </Text>
+        </View>
+      </ScrollView>
     );
   }
 
@@ -345,5 +467,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
+  },
+  offlineBanner: {
+    margin: 16,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  offlineText: {
+    fontSize: 14,
+    color: '#92400E',
+    fontWeight: '600' as const,
+    marginBottom: 4,
+  },
+  offlineSubtext: {
+    fontSize: 12,
+    color: '#78350F',
   },
 });

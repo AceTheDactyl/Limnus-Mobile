@@ -41,6 +41,7 @@ export const trpcClient = trpc.createClient({
       transformer: superjson,
       fetch: async (url, options) => {
         console.log('tRPC fetch:', url, options?.method || 'GET');
+        console.log('Base URL being used:', getBaseUrl());
         
         const maxRetries = 2; // Reduce retries for faster fallback
         let lastError: Error | null = null;
