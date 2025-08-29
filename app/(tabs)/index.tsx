@@ -49,7 +49,7 @@ export default function ChatScreen() {
     isOffline,
     connectionError,
     retryConnection,
-    startNewConversation,
+    saveAndStartNewConversation,
   } = useChat();
 
   const {
@@ -123,7 +123,7 @@ export default function ChatScreen() {
     if (Platform.OS !== 'web') {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    startNewConversation();
+    await saveAndStartNewConversation();
   };
 
   const renderMessage = ({ item, index }: { item: any; index: number }) => {

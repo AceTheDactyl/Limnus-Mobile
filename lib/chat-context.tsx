@@ -135,29 +135,6 @@ export const [ChatProvider, useChat] = createContextHook(() => {
     }
   }, [currentConversationId]);
 
-  const startNewConversation = useCallback(() => {
-    const newConversationId = `conv-${Date.now()}`;
-    setCurrentConversationId(newConversationId);
-    setMessages([]);
-  }, []);
-
-  const selectConversation = useCallback((conversationId: string) => {
-    setCurrentConversationId(conversationId);
-  }, []);
-  
-  // Reload conversations from storage
-  const reloadConversations = useCallback(async () => {
-    try {
-      const savedConversationsJson = await AsyncStorage.getItem('saved_conversations');
-      if (savedConversationsJson) {
-        const savedConversations: Conversation[] = JSON.parse(savedConversationsJson);
-        setConversations(savedConversations.sort((a, b) => b.timestamp - a.timestamp));
-      }
-    } catch (error) {
-      console.error('Failed to reload conversations:', error);
-    }
-  }, []);
-
   // Generate conversation title from first user message
   const generateConversationTitle = useCallback((firstMessage: string): string => {
     // Clean and truncate the message for title
@@ -169,6 +146,19 @@ export const [ChatProvider, useChat] = createContextHook(() => {
     const lastSpace = truncated.lastIndexOf(' ');
     
     return lastSpace > 20 ? truncated.slice(0, lastSpace) + '...' : truncated + '...';
+  }, []);
+
+  // Reload conversations from storage
+  const reloadConversations = useCallback(async () => {
+    try {
+      const savedConversationsJson = await AsyncStorage.getItem('saved_conversations');
+      if (savedConversationsJson) {
+        const savedConversations: Conversation[] = JSON.parse(savedConversationsJson);
+        setConversations(savedConversations.sort((a, b) => b.timestamp - a.timestamp));
+      }
+    } catch (error) {
+      console.error('Failed to reload conversations:', error);
+    }
   }, []);
 
   // Save conversation to local storage
@@ -217,6 +207,41 @@ export const [ChatProvider, useChat] = createContextHook(() => {
       console.error('Failed to save conversation:', error);
     }
   }, [generateConversationTitle]);
+
+  const startNewConversation = useCallback(() => {
+    const newConversationId = `conv-${Date.now()}`;
+    setCurrentConversationId(newConversationId);
+    setMessages([]);
+  }, []);
+
+  const selectConversation = useCallback((conversationId: string) => {
+    setCurrentConversationId(conversationId);
+  }, []);
+
+  const saveCurrentConversation = useCallback(async () => {
+    if (currentConversationId && messages.length >= 2) {
+      try {
+        await saveConversationToStorage(currentConversationId, messages);
+        await reloadConversations();
+        console.log('Current conversation saved successfully');
+        return true;
+      } catch (error) {
+        console.error('Failed to save current conversation:', error);
+        return false;
+      }
+    }
+    return false;
+  }, [currentConversationId, messages, saveConversationToStorage, reloadConversations]);
+
+  const saveAndStartNewConversation = useCallback(async () => {
+    // Save current conversation if it has messages
+    if (currentConversationId && messages.length >= 2) {
+      await saveCurrentConversation();
+    }
+    
+    // Start new conversation
+    startNewConversation();
+  }, [currentConversationId, messages, saveCurrentConversation, startNewConversation]);
 
   // Generate local fallback response when backend is not available
   const generateLocalResponse = useCallback((userMessage: string): string => {
@@ -400,6 +425,8 @@ export const [ChatProvider, useChat] = createContextHook(() => {
     sendMessage,
     retryConnection,
     reloadConversations,
+    saveCurrentConversation,
+    saveAndStartNewConversation,
   }), [
     currentConversationId,
     messages,
@@ -415,5 +442,7 @@ export const [ChatProvider, useChat] = createContextHook(() => {
     sendMessage,
     retryConnection,
     reloadConversations,
+    saveCurrentConversation,
+    saveAndStartNewConversation,
   ]);
 });

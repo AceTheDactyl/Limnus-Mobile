@@ -28,10 +28,9 @@ import { trpc } from '@/lib/trpc';
 interface SavedConversation {
   id: string;
   title: string;
-  preview: string;
-  timestamp: string;
-  messageCount: number;
-  isStarred: boolean;
+  lastMessage: string;
+  timestamp: number;
+  isStarred?: boolean;
   tags?: string[];
 }
 
@@ -48,9 +47,13 @@ export default function SavedConversationsScreen() {
       const saved = await AsyncStorage.getItem(SAVED_CONVERSATIONS_KEY);
       if (saved) {
         const conversations = JSON.parse(saved) as SavedConversation[];
-        setSavedConversations(conversations.sort((a, b) => 
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        ));
+        // Add default values for missing properties
+        const conversationsWithDefaults = conversations.map(conv => ({
+          ...conv,
+          isStarred: conv.isStarred || false,
+          tags: conv.tags || []
+        }));
+        setSavedConversations(conversationsWithDefaults.sort((a, b) => b.timestamp - a.timestamp));
       }
     } catch (error) {
       console.error('Error loading saved conversations:', error);
@@ -124,7 +127,7 @@ export default function SavedConversationsScreen() {
     }
   };
   
-  const formatTimestamp = (timestamp: string) => {
+  const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp);
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
@@ -206,7 +209,7 @@ export default function SavedConversationsScreen() {
         </View>
         
         <Text style={styles.conversationPreview} numberOfLines={2}>
-          {conversation.preview}
+          {conversation.lastMessage}
         </Text>
         
         <View style={styles.conversationFooter}>
@@ -216,11 +219,11 @@ export default function SavedConversationsScreen() {
               {formatTimestamp(conversation.timestamp)}
             </Text>
             <Text style={styles.conversationMessageCount}>
-              {conversation.messageCount} messages
+              Saved conversation
             </Text>
           </View>
           
-          {conversation.tags && conversation.tags.length > 0 && (
+          {conversation.tags && Array.isArray(conversation.tags) && conversation.tags.length > 0 && (
             <View style={styles.conversationTags}>
               {conversation.tags.slice(0, 2).map((tag, index) => (
                 <View key={index} style={styles.tag}>
