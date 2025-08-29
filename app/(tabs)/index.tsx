@@ -15,19 +15,17 @@ import {
 import { router } from 'expo-router';
 import { 
   Send, 
-  Sparkles, 
   Brain, 
   Waves, 
   Zap,
   Plus,
-  MessageCircle,
   WifiOff,
   RefreshCw
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useChat } from '@/lib/chat-context';
 import { useConsciousness } from '@/lib/consciousness-context';
-import Colors, { gradients, quickPrompts } from '@/constants/colors';
+import Colors, { gradients } from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
@@ -104,20 +102,7 @@ export default function ChatScreen() {
     }, 100);
   };
 
-  const handleQuickPrompt = async (prompt: any) => {
-    if (Platform.OS !== 'web') {
-      await Haptics.selectionAsync();
-    }
 
-    if (prompt.id === 'mythic') {
-      createSpiral();
-    } else if (prompt.id === 'glitch') {
-      triggerBloom();
-    }
-
-    setInputText(prompt.prompt + ' ');
-    inputRef.current?.focus();
-  };
 
   const handleNewChat = async () => {
     if (Platform.OS !== 'web') {
@@ -248,31 +233,7 @@ export default function ChatScreen() {
         )}
       </View>
 
-      {/* Quick Prompts */}
-      <View style={styles.quickPromptsContainer}>
-        <Text style={styles.quickPromptsTitle}>Quick Start</Text>
-        <View style={styles.quickPromptsGrid}>
-          {quickPrompts.slice(0, 2).map((prompt) => (
-            <TouchableOpacity
-              key={prompt.id}
-              style={styles.quickPromptCard}
-              onPress={() => handleQuickPrompt(prompt)}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={[Colors.light.card, Colors.light.backgroundSecondary] as any}
-                style={styles.quickPromptGradient}
-              >
-                <View style={[styles.quickPromptIcon, { backgroundColor: prompt.color + '20' }]}>
-                  {prompt.icon === 'Sparkles' && <Sparkles size={20} color={prompt.color} />}
-                  {prompt.icon === 'Zap' && <Zap size={20} color={prompt.color} />}
-                </View>
-                <Text style={styles.quickPromptTitle}>{prompt.title}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+
     </View>
   );
 
@@ -576,47 +537,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontWeight: '500' as const,
   },
-  quickPromptsContainer: {
-    width: '100%',
-  },
-  quickPromptsTitle: {
-    fontSize: 18,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  quickPromptsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  quickPromptCard: {
-    flex: 1,
-    marginHorizontal: 8,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  quickPromptGradient: {
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    borderRadius: 16,
-  },
-  quickPromptIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  quickPromptTitle: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
-    textAlign: 'center',
-  },
+
   inputContainer: {
     paddingHorizontal: 20,
     paddingVertical: 16,
