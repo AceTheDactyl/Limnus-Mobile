@@ -32,7 +32,7 @@ interface SavedConversation {
   timestamp: string;
   messageCount: number;
   isStarred: boolean;
-  tags: string[];
+  tags?: string[];
 }
 
 const SAVED_CONVERSATIONS_KEY = 'saved_conversations';
@@ -220,7 +220,7 @@ export default function SavedConversationsScreen() {
             </Text>
           </View>
           
-          {conversation.tags.length > 0 && (
+          {conversation.tags && conversation.tags.length > 0 && (
             <View style={styles.conversationTags}>
               {conversation.tags.slice(0, 2).map((tag, index) => (
                 <View key={index} style={styles.tag}>
