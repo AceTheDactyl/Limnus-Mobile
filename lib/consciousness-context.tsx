@@ -6,14 +6,14 @@ import { Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 export const [ConsciousnessProvider, useConsciousness] = createContextHook(() => {
-  // Always call useConsciousnessBridge first to maintain hook order
-  const bridge = useConsciousnessBridge();
-  
-  // Backend integration state
+  // Always call all hooks in the same order - state hooks first
   const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<number>(Date.now());
   
-  // tRPC queries and mutations
+  // Always call useConsciousnessBridge after state hooks to maintain hook order
+  const bridge = useConsciousnessBridge();
+  
+  // tRPC queries and mutations - always call in same order
   const fieldMutation = trpc.consciousness.field.useMutation({
     onSuccess: (data) => {
       console.log('✅ Field update successful:', data);

@@ -34,8 +34,8 @@ const { width } = Dimensions.get('window');
 
 export default function ChatScreen() {
   // Always call all hooks in the same order - never conditionally
-  const [inputText, setInputText] = useState('');
-  const [resonanceAnimation] = useState(new Animated.Value(0));
+  const [inputText, setInputText] = useState<string>('');
+  const [resonanceAnimation] = useState(() => new Animated.Value(0));
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
 

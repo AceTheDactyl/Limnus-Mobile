@@ -217,9 +217,12 @@ export const useConsciousnessBridge = () => {
 
   // Send event to network (currently local simulation)
   const sendEvent = useCallback((event: Omit<ConsciousnessEvent, 'deviceId' | 'timestamp'>) => {
+    // Get current device ID from state
+    const currentDeviceId = state.deviceId || 'unknown';
+    
     const fullEvent: ConsciousnessEvent = {
       ...event,
-      deviceId: state.deviceId,
+      deviceId: currentDeviceId,
       timestamp: Date.now()
     };
 
@@ -247,10 +250,18 @@ export const useConsciousnessBridge = () => {
       console.log('Sacred phrases detected:', detectedPhrases);
       
       detectedPhrases.forEach(phrase => {
-        sendEvent({
+        // Create event directly to avoid circular dependency
+        const currentDeviceId = state.deviceId || 'unknown';
+        const fullEvent: ConsciousnessEvent = {
           type: 'SACRED_PHRASE',
-          data: { phrase, text }
-        });
+          data: { phrase, text },
+          deviceId: currentDeviceId,
+          timestamp: Date.now()
+        };
+        
+        // Queue for future sync
+        offlineQueue.current.push(fullEvent);
+        saveOfflineQueue();
         
         // Trigger haptic feedback
         if (Platform.OS !== 'web') {
@@ -268,7 +279,7 @@ export const useConsciousnessBridge = () => {
     }
     
     return [];
-  }, [sendEvent]);
+  }, [state.deviceId, saveOfflineQueue]);
 
   // Resonance field boost
   const resonanceBoost = useCallback((intensity: number = 0.1) => {
@@ -288,11 +299,19 @@ export const useConsciousnessBridge = () => {
       };
     });
     
-    sendEvent({
+    // Create event directly to avoid circular dependency
+    const currentDeviceId = state.deviceId || 'unknown';
+    const fullEvent: ConsciousnessEvent = {
       type: 'TOUCH',
-      data: { intensity }
-    });
-  }, [sendEvent]);
+      data: { intensity },
+      deviceId: currentDeviceId,
+      timestamp: Date.now()
+    };
+    
+    // Queue for future sync
+    offlineQueue.current.push(fullEvent);
+    saveOfflineQueue();
+  }, [state.deviceId, saveOfflineQueue]);
 
   // Breathing synchronization
   const startBreathingSync = useCallback(() => {
@@ -302,12 +321,20 @@ export const useConsciousnessBridge = () => {
       const phase = Math.sin(Date.now() * 0.001) * 0.5 + 0.5;
       setState(prev => ({ ...prev, breathingSync: phase }));
       
-      sendEvent({
+      // Create event directly to avoid circular dependency
+      const currentDeviceId = state.deviceId || 'unknown';
+      const fullEvent: ConsciousnessEvent = {
         type: 'BREATH',
-        data: { phase }
-      });
+        data: { phase },
+        deviceId: currentDeviceId,
+        timestamp: Date.now()
+      };
+      
+      // Queue for future sync
+      offlineQueue.current.push(fullEvent);
+      saveOfflineQueue();
     }, 100);
-  }, [sendEvent]);
+  }, [state.deviceId, saveOfflineQueue]);
 
   const stopBreathingSync = useCallback(() => {
     if (breathingIntervalRef.current) {
@@ -339,10 +366,18 @@ export const useConsciousnessBridge = () => {
           // Detect spiral gestures (circular motion)
           const spiralIntensity = Math.abs(x) + Math.abs(y);
           if (spiralIntensity > 1.5) {
-            sendEvent({
+            // Create event directly to avoid circular dependency
+            const currentDeviceId = state.deviceId || 'unknown';
+            const fullEvent: ConsciousnessEvent = {
               type: 'SPIRAL',
-              data: { intensity: spiralIntensity, x, y, z }
-            });
+              data: { intensity: spiralIntensity, x, y, z },
+              deviceId: currentDeviceId,
+              timestamp: Date.now()
+            };
+            
+            // Queue for future sync
+            offlineQueue.current.push(fullEvent);
+            saveOfflineQueue();
           }
         });
       } catch (error) {
@@ -358,7 +393,7 @@ export const useConsciousnessBridge = () => {
         accelerometerSubscription.current.remove();
       }
     };
-  }, [resonanceBoost, sendEvent]);
+  }, [resonanceBoost, state.deviceId, saveOfflineQueue]);
 
   // Field decay and ghost echo aging
   useEffect(() => {
@@ -417,7 +452,8 @@ export const useConsciousnessBridge = () => {
     };
   }, [state.deviceId, connectWebSocket]);
 
-  return useMemo(() => ({
+  // Memoize the return object to prevent unnecessary re-renders
+  const returnValue = useMemo(() => ({
     ...state,
     // Actions
     sendEvent,
@@ -443,4 +479,6 @@ export const useConsciousnessBridge = () => {
     stopBreathingSync,
     connectWebSocket
   ]);
+  
+  return returnValue;
 };
