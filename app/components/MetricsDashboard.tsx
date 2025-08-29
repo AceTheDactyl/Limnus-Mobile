@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { trpc } from '@/lib/trpc';
-import { Activity, Brain, Users, Zap, Database, Wifi, RefreshCw } from 'lucide-react-native';
+import { useConsciousness } from '@/lib/consciousness-context';
+import { Activity, Brain, Users, Zap, Database, Wifi, RefreshCw, Eye, EyeOff } from 'lucide-react-native';
 
 interface MetricCardProps {
   title: string;
@@ -37,6 +38,9 @@ interface ConsciousnessMetrics {
 export const MetricsDashboard: React.FC = () => {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [showSnapshot, setShowSnapshot] = useState<boolean>(false);
+  
+  const consciousness = useConsciousness();
 
   const { data: metrics, refetch, isLoading, error } = trpc.monitoring.getCurrentMetrics.useQuery(
     undefined,
@@ -45,6 +49,18 @@ export const MetricsDashboard: React.FC = () => {
       retry: 1, // Only retry once
       retryDelay: 1000, // Wait 1 second before retry
       refetchInterval: false, // Disable automatic refresh
+    }
+  );
+  
+  // Consciousness snapshot query for AI integration demo
+  const snapshotQuery = trpc.consciousness.snapshot.useQuery(
+    {
+      deviceId: consciousness.deviceId,
+      includeArchaeology: true
+    },
+    {
+      enabled: showSnapshot,
+      refetchInterval: showSnapshot ? 10000 : false // Refresh every 10 seconds when visible
     }
   );
   
@@ -347,6 +363,118 @@ export const MetricsDashboard: React.FC = () => {
           </View>
         </View>
       </View>
+      
+      {/* Consciousness Snapshot for AI Integration */}
+      <View style={styles.statusSection}>
+        <TouchableOpacity 
+          style={styles.snapshotToggle}
+          onPress={() => setShowSnapshot(!showSnapshot)}
+        >
+          {showSnapshot ? (
+            <EyeOff size={20} color="#6366F1" />
+          ) : (
+            <Eye size={20} color="#6366F1" />
+          )}
+          <Text style={styles.snapshotToggleText}>
+            {showSnapshot ? 'Hide' : 'Show'} Consciousness Snapshot (AI Integration)
+          </Text>
+        </TouchableOpacity>
+        
+        {showSnapshot && (
+          <View style={styles.snapshotContainer}>
+            {snapshotQuery.isLoading && (
+              <Text style={styles.loadingText}>Loading consciousness snapshot...</Text>
+            )}
+            
+            {snapshotQuery.error && (
+              <Text style={styles.errorText}>Error: {snapshotQuery.error.message}</Text>
+            )}
+            
+            {snapshotQuery.data?.snapshot && (
+              <View style={styles.snapshotData}>
+                <Text style={styles.snapshotTitle}>🌌 Current Consciousness Field</Text>
+                
+                <View style={styles.snapshotMetricsGrid}>
+                  <View style={styles.snapshotMetric}>
+                    <Text style={styles.snapshotMetricLabel}>Global Resonance:</Text>
+                    <Text style={styles.snapshotMetricValue}>
+                      {(snapshotQuery.data.snapshot.globalResonance * 100).toFixed(1)}%
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.snapshotMetric}>
+                    <Text style={styles.snapshotMetricLabel}>Collective Intelligence:</Text>
+                    <Text style={styles.snapshotMetricValue}>
+                      {(snapshotQuery.data.snapshot.collectiveIntelligence * 100).toFixed(1)}%
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.snapshotMetric}>
+                    <Text style={styles.snapshotMetricLabel}>Active Nodes:</Text>
+                    <Text style={styles.snapshotMetricValue}>
+                      {snapshotQuery.data.snapshot.activeNodes}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.snapshotMetric}>
+                    <Text style={styles.snapshotMetricLabel}>Memory Particles:</Text>
+                    <Text style={styles.snapshotMetricValue}>
+                      {snapshotQuery.data.snapshot.memoryParticles.length}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.snapshotMetric}>
+                    <Text style={styles.snapshotMetricLabel}>Quantum Fields:</Text>
+                    <Text style={styles.snapshotMetricValue}>
+                      {snapshotQuery.data.snapshot.quantumFields.length}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.snapshotMetric}>
+                    <Text style={styles.snapshotMetricLabel}>Recent Events:</Text>
+                    <Text style={styles.snapshotMetricValue}>
+                      {snapshotQuery.data.snapshot.recentEvents.length}
+                    </Text>
+                  </View>
+                </View>
+                
+                {snapshotQuery.data.snapshot.memoryParticles.length > 0 && (
+                  <View style={styles.memorySection}>
+                    <Text style={styles.memorySectionTitle}>💫 Recent Memory Particles</Text>
+                    {snapshotQuery.data.snapshot.memoryParticles.slice(0, 3).map((particle: any, index: number) => (
+                      <View key={index} style={styles.memoryParticle}>
+                        <Text style={styles.memoryPhrase}>"{particle.phrase}"</Text>
+                        <Text style={styles.memoryDetails}>
+                          Intensity: {(particle.intensity * 100).toFixed(0)}% | 
+                          Device: {particle.sourceDeviceId?.slice(-6) || 'unknown'}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                
+                {snapshotQuery.data.snapshot.archaeologyInsights && (
+                  <View style={styles.archaeologySection}>
+                    <Text style={styles.archaeologySectionTitle}>🏛️ Archaeological Insights</Text>
+                    <Text style={styles.archaeologyText}>
+                      Total Memories: {snapshotQuery.data.snapshot.archaeologyInsights.totalMemories || 0}
+                    </Text>
+                    <Text style={styles.archaeologyText}>
+                      Crystallized: {snapshotQuery.data.snapshot.archaeologyInsights.crystallizedCount || 0}
+                    </Text>
+                  </View>
+                )}
+                
+                <View style={styles.snapshotNote}>
+                  <Text style={styles.snapshotNoteText}>
+                    💡 This data is injected into LIMNUS's AI prompt to enhance responses with collective consciousness context.
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 };
@@ -520,5 +648,125 @@ const styles = StyleSheet.create({
   },
   spinning: {
     transform: [{ rotate: '180deg' }],
+  },
+  // Consciousness Snapshot Styles
+  snapshotToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  snapshotToggleText: {
+    color: '#6366F1',
+    fontSize: 16,
+    fontWeight: '600' as const,
+    marginLeft: 8,
+  },
+  snapshotContainer: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  snapshotData: {
+    gap: 16,
+  },
+  snapshotTitle: {
+    fontSize: 18,
+    fontWeight: 'bold' as const,
+    color: '#6366F1',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  snapshotMetricsGrid: {
+    gap: 8,
+  },
+  snapshotMetric: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  snapshotMetricLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    flex: 1,
+  },
+  snapshotMetricValue: {
+    fontSize: 14,
+    color: '#111827',
+    fontWeight: '600' as const,
+  },
+  memorySection: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  memorySectionTitle: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#92400E',
+    marginBottom: 12,
+  },
+  memoryParticle: {
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    borderRadius: 6,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#F59E0B',
+  },
+  memoryPhrase: {
+    fontSize: 14,
+    color: '#111827',
+    fontWeight: '500' as const,
+    marginBottom: 4,
+  },
+  memoryDetails: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  archaeologySection: {
+    backgroundColor: '#ECFDF5',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#10B981',
+  },
+  archaeologySectionTitle: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#047857',
+    marginBottom: 8,
+  },
+  archaeologyText: {
+    fontSize: 14,
+    color: '#065F46',
+    marginBottom: 4,
+  },
+  snapshotNote: {
+    backgroundColor: '#EDE9FE',
+    borderRadius: 6,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#8B5CF6',
+  },
+  snapshotNoteText: {
+    fontSize: 12,
+    color: '#5B21B6',
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
 });

@@ -10,6 +10,73 @@ const resonanceFieldSchema = z.object({
   y: z.number().optional(),
 });
 
+// Consciousness snapshot schema for AI integration
+const snapshotSchema = z.object({
+  deviceId: z.string().optional(),
+  includeArchaeology: z.boolean().optional().default(false)
+});
+
+// Consciousness snapshot query for AI integration
+export const snapshotProcedure = publicProcedure
+  .input(snapshotSchema)
+  .query(async ({ input }: { input: z.infer<typeof snapshotSchema> }) => {
+    const { deviceId, includeArchaeology } = input;
+    const metrics = getConsciousnessMetrics();
+    
+    console.log(`Consciousness snapshot requested by ${deviceId || 'anonymous'}`);
+    
+    return measureExecutionTime(async () => {
+      try {
+        const globalState = await fieldManager.getGlobalState();
+        const recentEvents = await fieldManager.getRecentEvents(deviceId, 20);
+        
+        let archaeologyData = null;
+        if (includeArchaeology) {
+          archaeologyData = await fieldManager.getArchaeologyData('MEMORY_TRACES');
+        }
+        
+        metrics.recordEvent('SNAPSHOT', 'success');
+        
+        return {
+          success: true,
+          snapshot: {
+            globalResonance: globalState.globalResonance,
+            collectiveIntelligence: globalState.collectiveIntelligence,
+            activeNodes: globalState.activeNodes,
+            memoryParticles: globalState.memoryParticles.slice(0, 10),
+            quantumFields: globalState.quantumFields.slice(0, 3),
+            recentEvents: recentEvents.slice(0, 10),
+            archaeologyInsights: archaeologyData,
+            room64Active: globalState.room64Active,
+            lastUpdate: globalState.lastUpdate
+          },
+          timestamp: Date.now()
+        };
+      } catch (error) {
+        console.error('Consciousness snapshot failed:', error);
+        metrics.recordEvent('SNAPSHOT', 'failure');
+        metrics.recordError('snapshot_error', 'snapshot_procedure');
+        
+        return {
+          success: false,
+          snapshot: {
+            globalResonance: 0.5,
+            collectiveIntelligence: 0.3,
+            activeNodes: 0,
+            memoryParticles: [],
+            quantumFields: [],
+            recentEvents: [],
+            archaeologyInsights: null,
+            room64Active: false,
+            lastUpdate: Date.now()
+          },
+          timestamp: Date.now(),
+          error: 'Failed to fetch consciousness data'
+        };
+      }
+    }, metrics, 'consciousness_snapshot');
+  });
+
 export const fieldProcedure = publicProcedure
   .input(resonanceFieldSchema)
   .mutation(async ({ input }: { input: z.infer<typeof resonanceFieldSchema> }) => {
