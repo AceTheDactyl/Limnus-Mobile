@@ -209,9 +209,15 @@ export const [ChatProvider, useChat] = createContextHook(() => {
   }, [generateConversationTitle]);
 
   const startNewConversation = useCallback(() => {
-    const newConversationId = `conv-${Date.now()}`;
+    const newConversationId = `conv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    console.log('Creating new conversation with ID:', newConversationId);
     setCurrentConversationId(newConversationId);
     setMessages([]);
+    
+    // Clear any streaming state
+    setStreamingMessage('');
+    setIsStreaming(false);
+    setIsSending(false);
   }, []);
 
   const selectConversation = useCallback((conversationId: string) => {
@@ -234,13 +240,21 @@ export const [ChatProvider, useChat] = createContextHook(() => {
   }, [currentConversationId, messages, saveConversationToStorage, reloadConversations]);
 
   const saveAndStartNewConversation = useCallback(async () => {
+    console.log('saveAndStartNewConversation called');
+    console.log('Current conversation ID:', currentConversationId);
+    console.log('Messages count:', messages.length);
+    
     // Save current conversation if it has messages
     if (currentConversationId && messages.length >= 2) {
-      await saveCurrentConversation();
+      console.log('Saving current conversation before starting new one');
+      const saved = await saveCurrentConversation();
+      console.log('Conversation saved:', saved);
     }
     
     // Start new conversation
+    console.log('Starting new conversation');
     startNewConversation();
+    console.log('New conversation started');
   }, [currentConversationId, messages, saveCurrentConversation, startNewConversation]);
 
   // Generate local fallback response when backend is not available

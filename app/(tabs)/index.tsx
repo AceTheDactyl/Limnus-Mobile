@@ -105,10 +105,16 @@ export default function ChatScreen() {
 
 
   const handleNewChat = async () => {
+    console.log('Plus button pressed - creating new chat');
     if (Platform.OS !== 'web') {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    await saveAndStartNewConversation();
+    try {
+      await saveAndStartNewConversation();
+      console.log('New chat created successfully');
+    } catch (error) {
+      console.error('Failed to create new chat:', error);
+    }
   };
 
   const renderMessage = ({ item, index }: { item: any; index: number }) => {
