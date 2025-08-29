@@ -99,9 +99,26 @@ export default function SavedConversationsScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const updated = savedConversations.filter(conv => conv.id !== conversationId);
-            setSavedConversations(updated);
-            await saveSavedConversations(updated);
+            try {
+              console.log('Deleting conversation:', conversationId);
+              const updated = savedConversations.filter(conv => conv.id !== conversationId);
+              console.log('Updated conversations count:', updated.length);
+              setSavedConversations(updated);
+              await saveSavedConversations(updated);
+              
+              // Also remove the conversation messages from storage
+              try {
+                await AsyncStorage.removeItem(`conversation_messages_${conversationId}`);
+                console.log('Conversation messages deleted from storage');
+              } catch (error) {
+                console.error('Error deleting conversation messages:', error);
+              }
+              
+              console.log('Conversation deleted successfully');
+            } catch (error) {
+              console.error('Error deleting conversation:', error);
+              Alert.alert('Error', 'Failed to delete conversation. Please try again.');
+            }
           },
         },
       ]
