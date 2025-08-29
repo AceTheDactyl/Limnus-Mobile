@@ -90,6 +90,9 @@ export default function SavedConversationsScreen() {
   };
   
   const deleteConversation = async (conversationId: string) => {
+    console.log('Delete button pressed for conversation:', conversationId);
+    console.log('Current saved conversations:', savedConversations.length);
+    
     Alert.alert(
       'Delete Conversation',
       'Are you sure you want to delete this saved conversation?',
@@ -101,8 +104,12 @@ export default function SavedConversationsScreen() {
           onPress: async () => {
             try {
               console.log('Deleting conversation:', conversationId);
+              console.log('Before filter - conversations:', savedConversations.map(c => c.id));
+              
               const updated = savedConversations.filter(conv => conv.id !== conversationId);
-              console.log('Updated conversations count:', updated.length);
+              console.log('After filter - updated conversations count:', updated.length);
+              console.log('Updated conversation IDs:', updated.map(c => c.id));
+              
               setSavedConversations(updated);
               await saveSavedConversations(updated);
               
@@ -115,6 +122,9 @@ export default function SavedConversationsScreen() {
               }
               
               console.log('Conversation deleted successfully');
+              
+              // Force reload from storage to ensure consistency
+              await loadSavedConversations();
             } catch (error) {
               console.error('Error deleting conversation:', error);
               Alert.alert('Error', 'Failed to delete conversation. Please try again.');
