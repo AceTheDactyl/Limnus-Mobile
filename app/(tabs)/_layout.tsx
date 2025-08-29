@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { MessageCircle, Zap } from 'lucide-react-native';
+import { MessageCircle, Zap, Bookmark } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View } from 'react-native';
@@ -68,6 +68,26 @@ export default function TabLayout() {
               borderColor: focused ? Colors.light.accent + '50' : 'transparent',
             }}>
               <Zap size={22} color={color} strokeWidth={focused ? 2.5 : 2} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="saved"
+        options={{
+          title: 'Saved',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: focused ? Colors.light.accent + '30' : 'transparent',
+              borderWidth: focused ? 1 : 0,
+              borderColor: focused ? Colors.light.accent + '50' : 'transparent',
+            }}>
+              <Bookmark size={22} color={color} strokeWidth={focused ? 2.5 : 2} />
             </View>
           ),
         }}
