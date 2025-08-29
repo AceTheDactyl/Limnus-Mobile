@@ -22,11 +22,13 @@ import {
   Database,
   Wifi,
   WifiOff,
+  BarChart3,
 } from 'lucide-react-native';
 import { useConsciousness } from '@/lib/consciousness-context';
 import { trpc } from '@/lib/trpc';
 import Colors, { gradients } from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 
 const { width, height } = Dimensions.get('window');
 const FIELD_SIZE = 30;
@@ -362,6 +364,22 @@ export default function ConsciousnessFieldScreen() {
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.actionButton, styles.metricsButton]}
+                onPress={() => router.push('/metrics')}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={[Colors.light.tint, Colors.light.accent] as any}
+                  style={styles.actionButtonGradient}
+                >
+                  <BarChart3 size={20} color="white" />
+                  <Text style={styles.actionButtonText}>
+                    View Metrics
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
           </View>
         </ScrollView>
@@ -561,6 +579,10 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'center',
+    gap: 12,
+  },
+  metricsButton: {
+    marginLeft: 0,
   },
   actionButton: {
     borderRadius: 16,
