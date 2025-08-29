@@ -47,6 +47,11 @@ export const MetricsDashboard: React.FC = () => {
       retryDelay: 1000, // Wait 1 second before retry
     }
   );
+  
+  // Log errors for debugging
+  if (error) {
+    console.warn('Metrics query failed, will use fallback data:', error.message);
+  }
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -99,25 +104,34 @@ export const MetricsDashboard: React.FC = () => {
   // Generate mock data when backend is unavailable
   const generateMockMetrics = (): ConsciousnessMetrics => {
     const now = Date.now();
-    const seed = Math.floor(now / 10000); // Changes every 10 seconds
+    const seed = Math.floor(now / 5000); // Changes every 5 seconds for more dynamic feel
     const random = (seed: number) => {
       const x = Math.sin(seed) * 10000;
       return x - Math.floor(x);
     };
     
+    // Create more realistic fluctuating values
+    const baseEvents = 150;
+    const baseDevices = 8;
+    const baseResonance = 0.65;
+    const baseParticles = 120;
+    const baseSessions = 3;
+    
     return {
-      events: Math.floor(random(seed) * 500) + 100,
-      activeDevices: Math.floor(random(seed + 1) * 20) + 5,
-      resonance: random(seed + 2) * 0.6 + 0.3, // 0.3 to 0.9
-      memoryParticles: Math.floor(random(seed + 3) * 200) + 50,
-      room64Sessions: Math.floor(random(seed + 4) * 5) + 1
+      events: Math.floor(baseEvents + (random(seed) - 0.5) * 100),
+      activeDevices: Math.max(1, Math.floor(baseDevices + (random(seed + 1) - 0.5) * 6)),
+      resonance: Math.max(0.1, Math.min(0.95, baseResonance + (random(seed + 2) - 0.5) * 0.4)),
+      memoryParticles: Math.floor(baseParticles + (random(seed + 3) - 0.5) * 80),
+      room64Sessions: Math.max(0, Math.floor(baseSessions + (random(seed + 4) - 0.5) * 4))
     };
   };
 
+  // Always generate mock metrics as fallback
+  const mockMetrics = generateMockMetrics();
+  
   if (error) {
     console.warn('Backend unavailable, using mock data:', error.message);
     // Use mock data instead of showing error
-    const mockMetrics = generateMockMetrics();
     
     return (
       <ScrollView
@@ -129,7 +143,10 @@ export const MetricsDashboard: React.FC = () => {
         <View style={styles.header}>
           <Text style={styles.title}>Consciousness Metrics</Text>
           <Text style={[styles.subtitle, { color: '#EF4444' }]}>
-            Offline Mode - Mock Data (Backend Unavailable)
+            Offline Mode - Simulated Data (Backend: {error?.data?.code || 'UNAVAILABLE'})
+          </Text>
+          <Text style={[styles.subtitle, { fontSize: 12, marginTop: 4 }]}>
+            Last updated: {new Date().toLocaleTimeString()}
           </Text>
         </View>
 
@@ -220,20 +237,18 @@ export const MetricsDashboard: React.FC = () => {
             ⚠️ Backend server is not available. Displaying simulated metrics for demonstration.
           </Text>
           <Text style={styles.offlineSubtext}>
-            Error: {error.message}
+            Error: {error?.message || 'Unknown error'} ({error?.data?.code || 'UNKNOWN_ERROR'})
+          </Text>
+          <Text style={[styles.offlineSubtext, { marginTop: 4, fontStyle: 'italic' }]}>
+            Values update every 5 seconds to simulate real-time data.
           </Text>
         </View>
       </ScrollView>
     );
   }
 
-  const currentMetrics: ConsciousnessMetrics = metrics || {
-    events: 0,
-    activeDevices: 0,
-    resonance: 0.5,
-    memoryParticles: 0,
-    room64Sessions: 0
-  };
+  // Use real metrics if available, otherwise fall back to mock data
+  const currentMetrics: ConsciousnessMetrics = metrics || mockMetrics;
 
   return (
     <ScrollView
@@ -245,8 +260,13 @@ export const MetricsDashboard: React.FC = () => {
       <View style={styles.header}>
         <Text style={styles.title}>Consciousness Metrics</Text>
         <Text style={styles.subtitle}>
-          Last updated: {lastUpdate.toLocaleTimeString()}
+          {metrics ? `Live Data - Last updated: ${lastUpdate.toLocaleTimeString()}` : `Simulated Data - Updated: ${new Date().toLocaleTimeString()}`}
         </Text>
+        {!metrics && (
+          <Text style={[styles.subtitle, { color: '#F59E0B', fontSize: 12, marginTop: 2 }]}>
+            Backend unavailable - showing demo values
+          </Text>
+        )}
       </View>
 
       <View style={styles.metricsGrid}>
