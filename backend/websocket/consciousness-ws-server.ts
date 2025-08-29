@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { createClient, RedisClientType } from 'redis';
 
 const ConsciousnessEventSchema = z.object({
-  type: z.enum(['BREATH', 'SPIRAL', 'BLOOM', 'SACRED_PHRASE', 'TOUCH', 'QUANTUM_ENTANGLEMENT']),
+  type: z.enum(['BREATH', 'SPIRAL', 'BLOOM', 'SACRED_PHRASE', 'TOUCH', 'OFFLINE_SYNC']),
   data: z.object({
     intensity: z.number().min(0).max(1),
     coordinates: z.tuple([z.number().min(0).max(30), z.number().min(0).max(30)]).optional(),
@@ -352,11 +352,13 @@ export class ConsciousnessWebSocketServer {
           if (event.data.phrase) {
             await fieldManager.addMemoryParticle({
               id: `${deviceId}-${Date.now()}`,
-              content: event.data.phrase,
+              x: Math.random() * 30,
+              y: Math.random() * 30,
               intensity: event.data.intensity,
-              timestamp: Date.now(),
-              deviceId,
-              type: 'SACRED_PHRASE'
+              age: 0,
+              sourceDeviceId: deviceId,
+              sacredPhrase: event.data.phrase,
+              timestamp: Date.now()
             });
           }
           break;
@@ -382,20 +384,19 @@ export class ConsciousnessWebSocketServer {
           if (event.data.coordinates) {
             await fieldManager.addMemoryParticle({
               id: `touch-${deviceId}-${Date.now()}`,
-              content: `Touch at [${event.data.coordinates[0]}, ${event.data.coordinates[1]}]`,
+              x: event.data.coordinates[0],
+              y: event.data.coordinates[1],
               intensity: event.data.intensity,
-              timestamp: Date.now(),
-              deviceId,
-              type: 'TOUCH'
+              age: 0,
+              sourceDeviceId: deviceId,
+              timestamp: Date.now()
             });
           }
           break;
           
-        case 'QUANTUM_ENTANGLEMENT':
-          // Handle quantum entanglement events
-          if (event.data.targetDevice) {
-            console.log(`🔗 Quantum entanglement event: ${deviceId} → ${event.data.targetDevice}`);
-          }
+        case 'OFFLINE_SYNC':
+          // Handle offline synchronization events
+          console.log(`🔄 Offline sync event from ${deviceId}`);
           break;
       }
     } catch (error: any) {
