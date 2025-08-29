@@ -93,7 +93,7 @@ app.use("*", async (c, next) => {
 app.use(
   "/trpc/*",
   trpcServer({
-    endpoint: "/api/trpc",
+    endpoint: "/trpc",
     router: appRouter,
     createContext,
   })
