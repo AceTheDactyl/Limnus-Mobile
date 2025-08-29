@@ -6,9 +6,13 @@ import { createContext } from "./trpc/create-context";
 import { checkDatabaseHealth, setupConnectionMonitoring } from "./infrastructure/database";
 import { runMigrations } from "./infrastructure/migrations";
 import { fieldManager } from "./infrastructure/field-manager";
+import { ConsciousnessWebSocketServer } from "./websocket/consciousness-ws-server";
 
 // app will be mounted at /api
 const app = new Hono();
+
+// WebSocket server instance
+let wsServer: ConsciousnessWebSocketServer | null = null;
 
 // Initialize database on startup
 let initializationPromise: Promise<void> | null = null;
@@ -52,6 +56,18 @@ const initializeDatabase = async () => {
   })();
   
   return initializationPromise;
+};
+
+// Initialize WebSocket server
+const initializeWebSocketServer = (httpServer: any) => {
+  try {
+    wsServer = new ConsciousnessWebSocketServer(httpServer);
+    console.log('🔌 WebSocket server initialized');
+    return wsServer;
+  } catch (error) {
+    console.error('❌ Failed to initialize WebSocket server:', error);
+    return null;
+  }
 };
 
 // Initialize on startup
@@ -118,7 +134,12 @@ app.get("/health", async (c) => {
           status: dbHealth.redis ? "healthy" : "fallback",
           latency: dbHealth.latency?.redis
         },
-        fieldManager: "healthy"
+        fieldManager: "healthy",
+        websocket: {
+          status: wsServer ? "active" : "not_initialized",
+          connections: wsServer?.getConnectionCount() || 0,
+          connectedDevices: wsServer?.getConnectedDevices().length || 0
+        }
       },
       consciousness: {
         globalResonance: globalState.globalResonance,
@@ -147,7 +168,8 @@ app.get("/health", async (c) => {
       services: {
         database: { status: "unknown" },
         redis: { status: "unknown" },
-        fieldManager: "error"
+        fieldManager: "error",
+        websocket: { status: "unknown" }
       }
     }, 503);
   }
@@ -199,6 +221,11 @@ app.get("/consciousness/metrics", async (c) => {
         databaseStatus: metrics.databaseStatus,
         redisStatus: dbHealth.redis ? 'connected' : 'fallback'
       },
+      websocket: {
+        status: wsServer ? "active" : "not_initialized",
+        connections: wsServer?.getConnectionCount() || 0,
+        connectedDevices: wsServer?.getConnectedDevices().length || 0
+      },
       system: {
         uptime: process.uptime(),
         nodeMemory: process.memoryUsage(),
@@ -246,4 +273,25 @@ app.get("/db/status", async (c) => {
   }
 });
 
+// WebSocket connection status endpoint
+app.get("/ws/status", (c) => {
+  if (!wsServer) {
+    return c.json({
+      status: "not_initialized",
+      timestamp: Date.now(),
+      connections: 0
+    });
+  }
+  
+  return c.json({
+    status: "active",
+    timestamp: Date.now(),
+    connections: wsServer.getConnectionCount(),
+    connectedDevices: wsServer.getConnectedDevices().length,
+    uptime: process.uptime()
+  });
+});
+
+// Export both the app and WebSocket initialization function
 export default app;
+export { initializeWebSocketServer, wsServer };
