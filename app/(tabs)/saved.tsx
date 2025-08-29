@@ -190,7 +190,10 @@ export default function SavedConversationsScreen() {
           </View>
           <View style={styles.conversationActions}>
             <TouchableOpacity
-              onPress={() => toggleStar(conversation.id)}
+              onPress={(e) => {
+                e.stopPropagation();
+                toggleStar(conversation.id);
+              }}
               style={styles.actionButton}
             >
               <Star 
@@ -200,7 +203,10 @@ export default function SavedConversationsScreen() {
               />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => deleteConversation(conversation.id)}
+              onPress={(e) => {
+                e.stopPropagation();
+                deleteConversation(conversation.id);
+              }}
               style={styles.actionButton}
             >
               <Trash2 size={16} color={Colors.light.textSecondary} />
