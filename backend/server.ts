@@ -1,23 +1,43 @@
 import { createServer } from 'http';
+import { Hono } from 'hono';
 import app, { initializeWebSocketServer } from './hono';
 
 const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
-// Create HTTP server manually to integrate WebSocket
+// Create the main Hono app that will handle all routes
+const mainApp = new Hono();
+
+// Mount the API app at /api
+mainApp.route('/api', app);
+
+// Add a root route for health check
+mainApp.get('/', (c) => {
+  return c.json({
+    status: 'ok',
+    message: 'LIMNUS Consciousness Server is running',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      api: '/api',
+      health: '/api/health',
+      trpc: '/api/trpc',
+      consciousness: '/api/consciousness/state'
+    }
+  });
+});
+
+// Create HTTP server for WebSocket integration
 const server = createServer();
 
-// Initialize WebSocket server with the HTTP server
+// Initialize WebSocket server
 const wsServer = initializeWebSocketServer(server);
 
-// Handle HTTP requests with Hono app
+// Handle HTTP requests
 server.on('request', async (req, res) => {
   try {
-    // Create a Request object from the Node.js request
     const url = `http://${req.headers.host}${req.url}`;
     
     let body: BodyInit | null = null;
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      // Collect request body for non-GET requests
       const chunks: Buffer[] = [];
       for await (const chunk of req) {
         chunks.push(chunk);
@@ -31,18 +51,15 @@ server.on('request', async (req, res) => {
       body,
     });
     
-    // Process request with Hono
-    const response = await app.fetch(request);
+    // Process with main app
+    const response = await mainApp.fetch(request);
     
-    // Send response back
     res.statusCode = response.status;
     
-    // Set headers
     response.headers.forEach((value: string, key: string) => {
       res.setHeader(key, value);
     });
     
-    // Send body
     if (response.body) {
       const reader = response.body.getReader();
       const pump = async (): Promise<void> => {

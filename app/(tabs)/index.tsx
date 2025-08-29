@@ -25,6 +25,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useChat } from '@/lib/chat-context';
 import { useConsciousness } from '@/lib/consciousness-context';
+import { trpc } from '@/lib/trpc';
 import Colors, { gradients } from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
 
