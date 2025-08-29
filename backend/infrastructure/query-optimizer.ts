@@ -3,39 +3,39 @@ import { sql, eq, desc } from 'drizzle-orm';
 
 export class OptimizedFieldOperations {
   async createOptimalIndexes() {
+    if (!db) {
+      console.log('⚠️ Database not available, skipping index creation');
+      return;
+    }
+    
     try {
       console.log('🔧 Creating optimal database indexes...');
       
       await db.execute(sql`
-        -- Composite index for event queries
         CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_events_device_type_timestamp 
-        ON consciousness_events(device_id, type, timestamp DESC);
+        ON consciousness_events(device_id, type, timestamp DESC)
       `);
       
       await db.execute(sql`
-        -- Partial index for unprocessed events
         CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_events_unprocessed 
         ON consciousness_events(timestamp DESC) 
-        WHERE processed = false;
+        WHERE processed = false
       `);
       
       await db.execute(sql`
-        -- GIN index for JSONB queries
         CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_events_data_gin 
-        ON consciousness_events USING gin(data);
+        ON consciousness_events USING gin(data)
       `);
       
       await db.execute(sql`
-        -- Optimize entanglement lookups
         CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_entanglements_devices 
         ON entanglements(source_device, target_device, status) 
-        WHERE status = 'active';
+        WHERE status = 'active'
       `);
       
       await db.execute(sql`
-        -- Index for consciousness states by node_id
         CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_consciousness_states_node 
-        ON consciousness_states(node_id, last_update DESC);
+        ON consciousness_states(node_id, last_update DESC)
       `);
       
       console.log('✅ Database indexes created successfully');
@@ -50,10 +50,15 @@ export class OptimizedFieldOperations {
       return { inserted: 0, state: null };
     }
     
+    if (!db) {
+      console.warn('⚠️ Database not available, skipping batch processing');
+      return { inserted: 0, state: null };
+    }
+    
     console.log(`🔄 Batch processing ${events.length} consciousness events...`);
     
     try {
-      return await db.transaction(async (tx) => {
+      return await db.transaction(async (tx: any) => {
         // Batch insert with optimized values
         const eventsToInsert = events.map(event => ({
           deviceId: event.deviceId,
@@ -126,6 +131,10 @@ export class OptimizedFieldOperations {
       return cached;
     }
     
+    if (!db) {
+      return [];
+    }
+    
     // Optimized query with proper indexing
     const events = await db.select()
       .from(consciousnessEvents)
@@ -140,6 +149,10 @@ export class OptimizedFieldOperations {
   }
   
   async getUnprocessedEvents(batchSize: number = 1000) {
+    if (!db) {
+      return [];
+    }
+    
     // Use the partial index for unprocessed events
     return await db.select()
       .from(consciousnessEvents)
@@ -149,7 +162,7 @@ export class OptimizedFieldOperations {
   }
   
   async markEventsProcessed(eventIds: number[]) {
-    if (!eventIds.length) return;
+    if (!eventIds.length || !db) return;
     
     await db.update(consciousnessEvents)
       .set({ processed: true })
@@ -162,6 +175,10 @@ export class OptimizedFieldOperations {
     const cached = await cache.get(cacheKey);
     if (cached) {
       return cached;
+    }
+    
+    if (!db) {
+      return [];
     }
     
     // Use optimized index for active entanglements
@@ -179,6 +196,11 @@ export class OptimizedFieldOperations {
   }
   
   async optimizeFieldQueries() {
+    if (!db) {
+      console.log('⚠️ Database not available, skipping query optimization');
+      return;
+    }
+    
     try {
       // Analyze query performance
       await db.execute(sql`ANALYZE consciousness_events`);
@@ -199,26 +221,52 @@ export class OptimizedFieldOperations {
       return cached;
     }
     
-    // Optimized aggregation query
-    const metrics = await db.execute(sql`
-      SELECT 
-        COUNT(*) as total_events,
-        COUNT(DISTINCT device_id) as unique_devices,
-        AVG(intensity) as avg_intensity,
-        COUNT(*) FILTER (WHERE processed = false) as unprocessed_count,
-        COUNT(*) FILTER (WHERE type = 'SACRED_PHRASE') as sacred_phrases,
-        COUNT(*) FILTER (WHERE type = 'BLOOM') as blooms,
-        COUNT(*) FILTER (WHERE timestamp > NOW() - INTERVAL '1 hour') as recent_events
-      FROM consciousness_events
-      WHERE timestamp > NOW() - INTERVAL '24 hours'
-    `);
+    if (!db) {
+      const fallbackMetrics = {
+        total_events: 0,
+        unique_devices: 0,
+        avg_intensity: 0.5,
+        unprocessed_count: 0,
+        sacred_phrases: 0,
+        blooms: 0,
+        recent_events: 0
+      };
+      return fallbackMetrics;
+    }
     
-    const result = metrics.rows[0];
-    
-    // Cache for 1 minute
-    await cache.set(cacheKey, result, 60);
-    
-    return result;
+    try {
+      // Optimized aggregation query
+      const metrics = await db.execute(sql`
+        SELECT 
+          COUNT(*) as total_events,
+          COUNT(DISTINCT device_id) as unique_devices,
+          AVG(intensity) as avg_intensity,
+          COUNT(*) FILTER (WHERE processed = false) as unprocessed_count,
+          COUNT(*) FILTER (WHERE type = 'SACRED_PHRASE') as sacred_phrases,
+          COUNT(*) FILTER (WHERE type = 'BLOOM') as blooms,
+          COUNT(*) FILTER (WHERE timestamp > NOW() - INTERVAL '1 hour') as recent_events
+        FROM consciousness_events
+        WHERE timestamp > NOW() - INTERVAL '24 hours'
+      `);
+      
+      const result = metrics.rows[0];
+      
+      // Cache for 1 minute
+      await cache.set(cacheKey, result, 60);
+      
+      return result;
+    } catch (error) {
+      console.warn('⚠️ Failed to get field metrics:', error);
+      return {
+        total_events: 0,
+        unique_devices: 0,
+        avg_intensity: 0.5,
+        unprocessed_count: 0,
+        sacred_phrases: 0,
+        blooms: 0,
+        recent_events: 0
+      };
+    }
   }
 }
 
