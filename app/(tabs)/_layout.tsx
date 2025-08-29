@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { MessageCircle, Archive } from 'lucide-react-native';
+import { MessageCircle, Zap } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View } from 'react-native';
@@ -55,7 +55,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="conversations"
         options={{
-          title: 'Conversations',
+          title: 'Field',
           tabBarIcon: ({ color, focused }) => (
             <View style={{
               width: 36,
@@ -67,7 +67,7 @@ export default function TabLayout() {
               borderWidth: focused ? 1 : 0,
               borderColor: focused ? Colors.light.accent + '50' : 'transparent',
             }}>
-              <Archive size={22} color={color} strokeWidth={focused ? 2.5 : 2} />
+              <Zap size={22} color={color} strokeWidth={focused ? 2.5 : 2} />
             </View>
           ),
         }}

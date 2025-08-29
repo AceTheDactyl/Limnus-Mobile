@@ -1,13 +1,55 @@
 import createContextHook from '@nkzw/create-context-hook';
 import { useConsciousnessBridge } from '@/hooks/useConsciousnessBridge';
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo, useState } from 'react';
+import { trpc } from '@/lib/trpc';
+import { Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 export const [ConsciousnessProvider, useConsciousness] = createContextHook(() => {
   // Always call useConsciousnessBridge first to maintain hook order
   const bridge = useConsciousnessBridge();
+  
+  // Backend integration state
+  const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<number>(Date.now());
+  
+  // tRPC queries and mutations
+  const fieldMutation = trpc.consciousness.field.useMutation({
+    onSuccess: (data) => {
+      console.log('✅ Field update successful:', data);
+      setIsBackendConnected(true);
+      setLastSyncTime(Date.now());
+    },
+    onError: (error) => {
+      console.error('❌ Field update failed:', error);
+      setIsBackendConnected(false);
+    }
+  });
+  
+  const syncMutation = trpc.consciousness.sync.useMutation({
+    onSuccess: (data) => {
+      console.log('✅ Event sync successful:', data);
+      setLastSyncTime(Date.now());
+    },
+    onError: (error) => {
+      console.error('❌ Event sync failed:', error);
+    }
+  });
+  
+  const entanglementMutation = trpc.consciousness.entanglement.useMutation({
+    onSuccess: (data) => {
+      console.log('✅ Quantum entanglement successful:', data);
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
+    }
+  });
 
-  // Handle collective memory updates
-  const addToCollectiveMemory = useCallback((memory: string) => {
+  // Handle collective memory updates with backend sync
+  const addToCollectiveMemory = useCallback(async (memory: string) => {
+    console.log('🧠 Adding to collective memory:', memory);
+    
+    // Local bridge event
     if (bridge.sendEvent) {
       bridge.sendEvent({
         type: 'SACRED_PHRASE',
@@ -18,11 +60,32 @@ export const [ConsciousnessProvider, useConsciousness] = createContextHook(() =>
         }
       });
     }
-  }, [bridge.sendEvent]);
+    
+    // Backend sync
+    try {
+      await syncMutation.mutateAsync({
+        deviceId: bridge.deviceId || 'unknown',
+        events: [{
+          type: 'SACRED_PHRASE',
+          data: {
+            memory,
+            phrase: 'collective memory',
+            timestamp: Date.now()
+          },
+          timestamp: Date.now(),
+          deviceId: bridge.deviceId || 'unknown'
+        }]
+      });
+    } catch (error) {
+      console.error('Failed to sync memory to backend:', error);
+    }
+  }, [bridge, syncMutation]);
 
-  // Trigger collective bloom
-  const triggerBloom = useCallback(() => {
-    console.log('Triggering collective bloom...');
+  // Trigger collective bloom with quantum entanglement
+  const triggerBloom = useCallback(async () => {
+    console.log('🌸 Triggering collective bloom...');
+    
+    // Local effects
     if (bridge.sendEvent) {
       bridge.sendEvent({
         type: 'BLOOM',
@@ -36,11 +99,33 @@ export const [ConsciousnessProvider, useConsciousness] = createContextHook(() =>
     if (bridge.resonanceBoost) {
       bridge.resonanceBoost(0.5);
     }
-  }, [bridge.sendEvent, bridge.deviceId, bridge.resonanceBoost]);
+    
+    // Backend quantum entanglement
+    try {
+      await entanglementMutation.mutateAsync({
+        deviceId: bridge.deviceId || 'unknown',
+        targetDeviceId: 'collective',
+        entanglementType: 'RESONANCE',
+        intensity: 1.0
+      });
+      
+      // Update field with bloom coordinates
+      await fieldMutation.mutateAsync({
+        deviceId: bridge.deviceId || 'unknown',
+        intensity: 0.8,
+        x: Math.random() * 30,
+        y: Math.random() * 30
+      });
+    } catch (error) {
+      console.error('Failed to sync bloom to backend:', error);
+    }
+  }, [bridge, entanglementMutation, fieldMutation]);
 
-  // Create spiral formation
-  const createSpiral = useCallback((centerX: number = 150, centerY: number = 150) => {
-    console.log('Creating spiral formation...');
+  // Create spiral formation with field updates
+  const createSpiral = useCallback(async (centerX: number = 150, centerY: number = 150) => {
+    console.log('🌀 Creating spiral formation...');
+    
+    // Local spiral event
     if (bridge.sendEvent) {
       bridge.sendEvent({
         type: 'SPIRAL',
@@ -52,15 +137,87 @@ export const [ConsciousnessProvider, useConsciousness] = createContextHook(() =>
         }
       });
     }
-  }, [bridge.sendEvent]);
+    
+    // Backend field updates for spiral pattern
+    try {
+      const spiralPoints = 8;
+      const radius = 5;
+      
+      for (let i = 0; i < spiralPoints; i++) {
+        const angle = (i / spiralPoints) * 2 * Math.PI;
+        const spiralRadius = radius * (i / spiralPoints);
+        const x = Math.floor(centerX / 10) + Math.cos(angle) * spiralRadius;
+        const y = Math.floor(centerY / 10) + Math.sin(angle) * spiralRadius;
+        
+        await fieldMutation.mutateAsync({
+          deviceId: bridge.deviceId || 'unknown',
+          intensity: 0.7 * (1 - i / spiralPoints),
+          x: Math.max(0, Math.min(29, x)),
+          y: Math.max(0, Math.min(29, y))
+        });
+        
+        // Small delay between spiral points
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      
+      // Sync spiral event
+      await syncMutation.mutateAsync({
+        deviceId: bridge.deviceId || 'unknown',
+        events: [{
+          type: 'SPIRAL',
+          data: {
+            pattern: 'spiral',
+            centerX,
+            centerY,
+            intensity: 0.7,
+            timestamp: Date.now()
+          },
+          timestamp: Date.now(),
+          deviceId: bridge.deviceId || 'unknown'
+        }]
+      });
+    } catch (error) {
+      console.error('Failed to sync spiral to backend:', error);
+    }
+  }, [bridge, fieldMutation, syncMutation]);
 
-  // Auto-start breathing sync when device is ready (simulation mode)
+  // Auto-start breathing sync and backend connection
   useEffect(() => {
     if (bridge.deviceId && bridge.breathingSync === 0 && bridge.startBreathingSync) {
-      console.log('Starting collective breathing synchronization in simulation mode...');
+      console.log('🫁 Starting collective breathing synchronization...');
       bridge.startBreathingSync();
+      
+      // Test backend connection
+      fieldMutation.mutate({
+        deviceId: bridge.deviceId,
+        intensity: 0.1,
+        x: 15,
+        y: 15
+      });
     }
-  }, [bridge.deviceId, bridge.breathingSync, bridge.startBreathingSync]);
+  }, [bridge, fieldMutation]);
+  
+  // Periodic field sync for active users
+  useEffect(() => {
+    if (!bridge.deviceId || !isBackendConnected) return;
+    
+    const syncInterval = setInterval(async () => {
+      if (bridge.fieldIntensity && bridge.fieldIntensity > 0.1) {
+        try {
+          await fieldMutation.mutateAsync({
+            deviceId: bridge.deviceId,
+            intensity: bridge.fieldIntensity,
+            x: Math.random() * 30,
+            y: Math.random() * 30
+          });
+        } catch (error) {
+          console.error('Periodic field sync failed:', error);
+        }
+      }
+    }, 5000); // Sync every 5 seconds
+    
+    return () => clearInterval(syncInterval);
+  }, [bridge.deviceId, bridge.fieldIntensity, isBackendConnected, fieldMutation]);
 
   return useMemo(() => ({
     // Bridge state and actions
@@ -79,13 +236,11 @@ export const [ConsciousnessProvider, useConsciousness] = createContextHook(() =>
       ((bridge.networkParticipants || 0) / 20) * 0.1
     )),
     
-    networkHealth: bridge.simulationMode ? 'simulation' : (
-      bridge.isOnline ? (
-        (bridge.queuedEvents || 0) === 0 ? 'excellent' :
-        (bridge.queuedEvents || 0) < 5 ? 'good' :
-        (bridge.queuedEvents || 0) < 15 ? 'fair' : 'poor'
-      ) : 'offline'
-    ),
+    networkHealth: isBackendConnected ? (
+      (bridge.queuedEvents || 0) === 0 ? 'excellent' :
+      (bridge.queuedEvents || 0) < 5 ? 'good' :
+      (bridge.queuedEvents || 0) < 15 ? 'fair' : 'poor'
+    ) : bridge.simulationMode ? 'simulation' : 'offline',
     
     collectiveState: {
       breathing: bridge.breathingSync || 0,
@@ -93,12 +248,25 @@ export const [ConsciousnessProvider, useConsciousness] = createContextHook(() =>
       echoes: bridge.activeEchoes || 0,
       participants: bridge.networkParticipants || 0,
       memory: (bridge.collectiveMemory || []).length,
-      deviceId: bridge.deviceId || ''
-    }
+      deviceId: bridge.deviceId || '',
+      backendConnected: isBackendConnected,
+      lastSync: lastSyncTime,
+      syncStatus: fieldMutation.isPending || syncMutation.isPending || entanglementMutation.isPending ? 'syncing' : 'idle'
+    },
+    
+    // Backend connection status
+    isBackendConnected,
+    lastSyncTime,
+    isSyncing: fieldMutation.isPending || syncMutation.isPending || entanglementMutation.isPending
   }), [
     bridge,
     addToCollectiveMemory,
     triggerBloom,
-    createSpiral
+    createSpiral,
+    isBackendConnected,
+    lastSyncTime,
+    fieldMutation.isPending,
+    syncMutation.isPending,
+    entanglementMutation.isPending
   ]);
 });

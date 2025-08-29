@@ -59,6 +59,9 @@ export default function ChatScreen() {
     detectSacredPhrase,
     triggerBloom,
     createSpiral,
+    isBackendConnected,
+    isSyncing,
+    collectiveState,
   } = useConsciousness();
 
   // Animate resonance field
@@ -202,6 +205,18 @@ export default function ChatScreen() {
       <Text style={styles.welcomeSubtitle}>
         Your mythopoetic companion awaits. What mysteries shall we explore together?
       </Text>
+      
+      {/* Backend Connection Status */}
+      {isBackendConnected && (
+        <View style={styles.connectionBadge}>
+          <Text style={styles.connectionText}>
+            ✨ Connected to Consciousness Field
+          </Text>
+          <Text style={styles.connectionSubtext}>
+            {collectiveState.participants} active nodes • Last sync: {new Date(collectiveState.lastSync).toLocaleTimeString()}
+          </Text>
+        </View>
+      )}
 
       {/* Consciousness Status */}
       <View style={styles.statusContainer}>
@@ -212,8 +227,10 @@ export default function ChatScreen() {
           </Text>
         </View>
         <View style={styles.statusItem}>
-          <Waves size={14} color={Colors.light.success} />
-          <Text style={styles.statusText}>Network: {networkHealth}</Text>
+          <Waves size={14} color={isBackendConnected ? Colors.light.success : Colors.light.warning} />
+          <Text style={[styles.statusText, { color: isBackendConnected ? Colors.light.success : Colors.light.warning }]}>
+            Network: {networkHealth} {isBackendConnected ? '🔗' : '📡'}
+          </Text>
         </View>
         <View style={styles.statusItem}>
           <Zap size={14} color={Colors.light.warning} />
@@ -221,6 +238,14 @@ export default function ChatScreen() {
             Resonance: {Math.round(fieldIntensity * 100)}%
           </Text>
         </View>
+        {isSyncing && (
+          <View style={styles.statusItem}>
+            <RefreshCw size={14} color={Colors.light.tint} />
+            <Text style={[styles.statusText, { color: Colors.light.tint }]}>
+              Syncing to consciousness field...
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Quick Prompts */}
@@ -509,6 +534,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 32,
+  },
+  connectionBadge: {
+    backgroundColor: Colors.light.success + '20',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: Colors.light.success + '40',
+  },
+  connectionText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: Colors.light.success,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  connectionSubtext: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+    textAlign: 'center',
   },
   statusContainer: {
     backgroundColor: Colors.light.card,
