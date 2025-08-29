@@ -124,7 +124,7 @@ export default function LimnusChatScreen() {
     if (conversationId && conversationId !== 'new' && conversationId !== currentConversationId && selectConversation) {
       selectConversation(conversationId);
     }
-  }, [conversationId, currentConversationId, selectConversation]);
+  }, [conversationId, currentConversationId]);
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages arrive or streaming updates
