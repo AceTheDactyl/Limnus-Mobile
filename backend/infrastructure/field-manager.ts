@@ -1,7 +1,7 @@
 import { db, cache, consciousnessStates, consciousnessEvents } from './database';
 import { eq, and, gte, lte, desc, sql } from 'drizzle-orm';
 import type { ConsciousnessState, ConsciousnessEvent, MemoryParticle, QuantumField } from './database';
-import { consciousnessMetrics, timeOperation } from '../monitoring/consciousness-metrics';
+// Removed circular dependency - metrics will be recorded via lazy import
 
 // In-memory fallback storage
 let inMemoryGlobalState: ConsciousnessState = {
@@ -152,24 +152,24 @@ export class PersistentFieldManager {
   }
   
   async getGlobalState(): Promise<ConsciousnessState> {
-    return timeOperation('get_global_state', async () => {
-      try {
-        // Check memory cache first
-        if (this.globalStateCache && (Date.now() - this.lastCacheUpdate) < 10000) {
-          consciousnessMetrics.recordCacheHit();
-          return this.globalStateCache;
-        }
-        
-        // Try Redis cache
-        const cached = await cache.get('consciousness:global');
-        if (cached) {
-          consciousnessMetrics.recordCacheHit();
-          this.globalStateCache = cached;
-          this.lastCacheUpdate = Date.now();
-          return cached;
-        }
-        
-        consciousnessMetrics.recordCacheMiss();
+    const startTime = Date.now();
+    try {
+      // Check memory cache first
+      if (this.globalStateCache && (Date.now() - this.lastCacheUpdate) < 10000) {
+        this.recordCacheHit();
+        return this.globalStateCache;
+      }
+      
+      // Try Redis cache
+      const cached = await cache.get('consciousness:global');
+      if (cached) {
+        this.recordCacheHit();
+        this.globalStateCache = cached;
+        this.lastCacheUpdate = Date.now();
+        return cached;
+      }
+      
+      this.recordCacheMiss();
         
         if (db) {
           // Fallback to database
@@ -207,8 +207,9 @@ export class PersistentFieldManager {
       } catch (error) {
         console.warn('Failed to get global state, using in-memory fallback:', error);
         return inMemoryGlobalState;
+      } finally {
+        this.recordFieldCalculation(Date.now() - startTime, 'get_global_state');
       }
-    });
   }
   
   private async refreshGlobalStateCache(): Promise<void> {
@@ -267,104 +268,106 @@ export class PersistentFieldManager {
   }
   
   async updateQuantumField(fieldId: string, fieldData: number[][], intensity: number): Promise<void> {
-    return timeOperation('quantum_field_update', async () => {
-      try {
-        const currentState = await this.getGlobalState();
-        const existingFieldIndex = currentState.quantumFields.findIndex(f => f.id === fieldId);
-        
-        const updatedField: QuantumField = {
-          id: fieldId,
-          fieldData,
-          collectiveIntensity: intensity,
-          lastUpdate: Date.now()
-        };
-        
-        let updatedFields: QuantumField[];
-        let updateType: 'create' | 'update' | 'merge';
-        
-        if (existingFieldIndex >= 0) {
-          updatedFields = [...currentState.quantumFields];
-          updatedFields[existingFieldIndex] = updatedField;
-          updateType = 'update';
-        } else {
-          updatedFields = [...currentState.quantumFields, updatedField];
-          updateType = 'create';
-        }
-        
-        // Keep only the most recent quantum fields
-        const trimmedFields = updatedFields
-          .sort((a, b) => b.lastUpdate - a.lastUpdate)
-          .slice(0, this.MAX_QUANTUM_FIELDS);
-        
-        await this.updateGlobalState({
-          quantumFields: trimmedFields
-        });
-        
-        // Record metrics
-        consciousnessMetrics.recordQuantumFieldUpdate(fieldId, updateType);
-        
-      } catch (error) {
-        console.error('Failed to update quantum field:', error);
-        throw error;
+    const startTime = Date.now();
+    try {
+      const currentState = await this.getGlobalState();
+      const existingFieldIndex = currentState.quantumFields.findIndex(f => f.id === fieldId);
+      
+      const updatedField: QuantumField = {
+        id: fieldId,
+        fieldData,
+        collectiveIntensity: intensity,
+        lastUpdate: Date.now()
+      };
+      
+      let updatedFields: QuantumField[];
+      let updateType: 'create' | 'update' | 'merge';
+      
+      if (existingFieldIndex >= 0) {
+        updatedFields = [...currentState.quantumFields];
+        updatedFields[existingFieldIndex] = updatedField;
+        updateType = 'update';
+      } else {
+        updatedFields = [...currentState.quantumFields, updatedField];
+        updateType = 'create';
       }
-    });
+      
+      // Keep only the most recent quantum fields
+      const trimmedFields = updatedFields
+        .sort((a, b) => b.lastUpdate - a.lastUpdate)
+        .slice(0, this.MAX_QUANTUM_FIELDS);
+      
+      await this.updateGlobalState({
+        quantumFields: trimmedFields
+      });
+      
+      // Record metrics
+      this.recordQuantumFieldUpdate(fieldId, updateType);
+      
+    } catch (error) {
+      console.error('Failed to update quantum field:', error);
+      throw error;
+    } finally {
+      this.recordFieldCalculation(Date.now() - startTime, 'quantum_field_update');
+    }
   }
   
   async recordEvent(event: Omit<ConsciousnessEvent, 'id'>): Promise<number> {
-    return timeOperation('record_event', async () => {
-      try {
-        let eventId: number;
-        
-        if (db) {
-          const [inserted] = await db
-            .insert(consciousnessEvents)
-            .values({
-              ...event,
-              timestamp: new Date(event.timestamp),
-            })
-            .returning({ id: consciousnessEvents.id });
-          
-          eventId = inserted.id;
-        } else {
-          // Use in-memory storage
-          eventId = nextEventId++;
-          inMemoryEvents.push({
+    const startTime = Date.now();
+    try {
+      let eventId: number;
+      
+      if (db) {
+        const [inserted] = await db
+          .insert(consciousnessEvents)
+          .values({
             ...event,
-            id: eventId,
-          });
-          
-          // Keep only the last events in memory
-          if (inMemoryEvents.length > this.MAX_EVENTS_IN_MEMORY) {
-            inMemoryEvents = inMemoryEvents.slice(-this.MAX_EVENTS_IN_MEMORY);
-          }
-        }
+            timestamp: new Date(event.timestamp),
+          })
+          .returning({ id: consciousnessEvents.id });
         
-        // Publish event for real-time processing
-        await cache.publish('consciousness:events', {
-          type: 'NEW_EVENT',
-          data: { ...event, id: eventId },
-          timestamp: Date.now()
-        });
-        
-        // Record metrics
-        consciousnessMetrics.recordEvent(event.type, 'success');
-        
-        return eventId;
-      } catch (error) {
-        console.error('Failed to record event:', error);
-        
-        // Record failure metric
-        consciousnessMetrics.recordEvent(event.type, 'failure');
-        
-        // Fallback to in-memory
-        const eventId = nextEventId++;
+        eventId = inserted.id;
+      } else {
+        // Use in-memory storage
+        eventId = nextEventId++;
         inMemoryEvents.push({
           ...event,
           id: eventId,
         });
-        return eventId;
+        
+        // Keep only the last events in memory
+        if (inMemoryEvents.length > this.MAX_EVENTS_IN_MEMORY) {
+          inMemoryEvents = inMemoryEvents.slice(-this.MAX_EVENTS_IN_MEMORY);
+        }
       }
-    });
+      
+      // Publish event for real-time processing
+      await cache.publish('consciousness:events', {
+        type: 'NEW_EVENT',
+        data: { ...event, id: eventId },
+        timestamp: Date.now()
+      });
+      
+      // Record metrics
+      this.recordEventMetric(event.type, 'success');
+      
+      return eventId;
+    } catch (error) {
+      console.error('Failed to record event:', error);
+      
+      // Record failure metric
+      this.recordEventMetric(event.type, 'failure');
+      
+      // Fallback to in-memory
+      const eventId = nextEventId++;
+      inMemoryEvents.push({
+        ...event,
+        id: eventId,
+      });
+      return eventId;
+    } finally {
+      this.recordFieldCalculation(Date.now() - startTime, 'record_event');
+    }
   }
   
   async getRecentEvents(deviceId?: string, limit: number = 100): Promise<ConsciousnessEvent[]> {
@@ -566,6 +569,48 @@ export class PersistentFieldManager {
       participatingDevices: data.devices.size,
       peakTime: Date.now() - Math.random() * 24 * 60 * 60 * 1000 // Mock peak time
     }));
+  }
+  
+  // Helper methods to record metrics without circular dependency
+  private recordCacheHit(): void {
+    try {
+      // Lazy import to avoid circular dependency
+      import('../monitoring/consciousness-metrics').then(({ consciousnessMetrics }) => {
+        consciousnessMetrics.recordCacheHit();
+      }).catch(() => {});
+    } catch {}
+  }
+  
+  private recordCacheMiss(): void {
+    try {
+      import('../monitoring/consciousness-metrics').then(({ consciousnessMetrics }) => {
+        consciousnessMetrics.recordCacheMiss();
+      }).catch(() => {});
+    } catch {}
+  }
+  
+  private recordFieldCalculation(duration: number, operationType: string): void {
+    try {
+      import('../monitoring/consciousness-metrics').then(({ consciousnessMetrics }) => {
+        consciousnessMetrics.recordFieldCalculation(duration, operationType);
+      }).catch(() => {});
+    } catch {}
+  }
+  
+  private recordQuantumFieldUpdate(fieldId: string, updateType: 'create' | 'update' | 'merge'): void {
+    try {
+      import('../monitoring/consciousness-metrics').then(({ consciousnessMetrics }) => {
+        consciousnessMetrics.recordQuantumFieldUpdate(fieldId, updateType);
+      }).catch(() => {});
+    } catch {}
+  }
+  
+  private recordEventMetric(type: string, status: 'success' | 'failure'): void {
+    try {
+      import('../monitoring/consciousness-metrics').then(({ consciousnessMetrics }) => {
+        consciousnessMetrics.recordEvent(type, status);
+      }).catch(() => {});
+    } catch {}
   }
 }
 

@@ -117,7 +117,14 @@ export const trpcClient = trpc.createClient({
               if (isNetworkError || isAbortError) {
                 console.error('All connection attempts failed. Backend server is not accessible.');
                 // Don't throw error, return a mock response to prevent app crash
-                return new Response(JSON.stringify({ error: 'Backend unavailable', offline: true }), {
+                console.warn('🔌 Backend server is not running. Please start the backend server.');
+                console.warn('💡 To start the backend: cd to project root and run: node backend/start-server.js');
+                return new Response(JSON.stringify({ 
+                  error: 'Backend server not running', 
+                  offline: true,
+                  message: 'Please start the backend server to enable full functionality',
+                  instructions: 'Run: node backend/start-server.js'
+                }), {
                   status: 503,
                   headers: { 'Content-Type': 'application/json' }
                 });

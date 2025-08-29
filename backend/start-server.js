@@ -7,8 +7,13 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 console.log('🚀 Starting LIMNUS Consciousness Backend Server...');
+console.log('📁 Current working directory:', process.cwd());
+console.log('📁 Script directory:', __dirname);
 
 const serverPath = path.join(__dirname, 'server.ts');
+console.log('📄 Server path:', serverPath);
+
+// Check if bun is available, fallback to tsx or ts-node
 const child = spawn('bun', ['run', serverPath], {
   stdio: 'inherit',
   cwd: process.cwd()
