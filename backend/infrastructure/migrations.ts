@@ -30,6 +30,7 @@ export class MigrationRunner {
       await this.runMigration('003_add_constraints', this.migration003AddConstraints.bind(this));
       await this.runMigration('004_initialize_global_state', this.migration004InitializeGlobalState.bind(this));
       await this.runMigration('005_add_device_sessions', this.migration005AddDeviceSessions.bind(this));
+      await this.runMigration('006_add_performance_indexes', this.migration006AddPerformanceIndexes.bind(this));
       
       console.log('✅ All migrations completed successfully');
       return { success: true };
@@ -157,7 +158,7 @@ export class MigrationRunner {
   }
   
   private async migration002AddIndexes(): Promise<void> {
-    // Add performance indexes
+    // Add basic performance indexes
     await db!.execute(sql`CREATE INDEX IF NOT EXISTS idx_consciousness_events_device_id ON consciousness_events(device_id)`);
     await db!.execute(sql`CREATE INDEX IF NOT EXISTS idx_consciousness_events_timestamp ON consciousness_events(timestamp DESC)`);
     await db!.execute(sql`CREATE INDEX IF NOT EXISTS idx_consciousness_events_type ON consciousness_events(type)`);
@@ -172,6 +173,47 @@ export class MigrationRunner {
     await db!.execute(sql`CREATE INDEX IF NOT EXISTS idx_entanglements_source_device ON entanglements(source_device)`);
     await db!.execute(sql`CREATE INDEX IF NOT EXISTS idx_entanglements_target_device ON entanglements(target_device)`);
     await db!.execute(sql`CREATE INDEX IF NOT EXISTS idx_entanglements_status ON entanglements(status)`);
+  }
+  
+  private async migration006AddPerformanceIndexes(): Promise<void> {
+    // Add advanced performance indexes with CONCURRENTLY for production safety
+    console.log('🔄 Adding performance indexes (this may take a while)...');
+    
+    // Composite index for device + timestamp queries (most common pattern)
+    await db!.execute(sql`
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_events_device_timestamp 
+      ON consciousness_events(device_id, timestamp DESC)
+    `);
+    
+    // Partial index for high-intensity events (analytics queries)
+    await db!.execute(sql`
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_events_type_intensity 
+      ON consciousness_events(type, intensity) 
+      WHERE intensity > 0.5
+    `);
+    
+    // Partial index for active Room64 sessions
+    await db!.execute(sql`
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_room64_active 
+      ON room64_sessions(last_activity DESC) 
+      WHERE jsonb_array_length(participants) > 0
+    `);
+    
+    // Composite index for active entanglements
+    await db!.execute(sql`
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_entanglements_active 
+      ON entanglements(source_device, target_device) 
+      WHERE status = 'active'
+    `);
+    
+    // Partial index for unprocessed events (batch processing)
+    await db!.execute(sql`
+      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_events_unprocessed 
+      ON consciousness_events(timestamp DESC) 
+      WHERE processed = false
+    `);
+    
+    console.log('✅ Performance indexes added successfully');
   }
   
   private async migration003AddConstraints(): Promise<void> {
