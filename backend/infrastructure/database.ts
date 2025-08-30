@@ -263,6 +263,9 @@ export class CacheManager {
 
 export const cache = CacheManager.getInstance();
 
+// Export Redis instance for external use (after it's defined)
+export { redis };
+
 // Enhanced health check function with detailed metrics
 export async function checkDatabaseHealth(): Promise<{
   database: boolean;

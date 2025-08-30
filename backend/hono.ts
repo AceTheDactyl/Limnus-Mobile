@@ -7,6 +7,7 @@ import { checkDatabaseHealth, setupConnectionMonitoring } from "./infrastructure
 import { runMigrations } from "./infrastructure/migrations";
 import { fieldManager } from "./infrastructure/field-manager";
 import { ConsciousnessWebSocketServer } from "./websocket/consciousness-ws-server";
+import { initializeRateLimiter } from "./middleware/rate-limiter";
 
 // app will be mounted at /api
 const app = new Hono();
@@ -40,8 +41,20 @@ const initializeDatabase = async () => {
       // Initialize field manager (this will create global state if needed)
       await fieldManager.getGlobalState();
       
-      // Perform initial health check
+      // Initialize rate limiter with Redis if available
       const health = await checkDatabaseHealth();
+      let redis = null;
+      if (health.redis) {
+        try {
+          const dbModule = await import('./infrastructure/database');
+          redis = (dbModule as any).redis || null;
+        } catch (error) {
+          console.warn('⚠️ Failed to import Redis instance:', error);
+        }
+      }
+      initializeRateLimiter(redis);
+      
+      // Perform initial health check
       console.log('📊 Initial health check:', {
         database: health.database ? '✅' : '❌',
         redis: health.redis ? '✅' : '❌',
@@ -211,6 +224,10 @@ app.get("/consciousness/metrics", async (c) => {
         redis: {
           status: dbHealth.redis ? 'connected' : 'fallback',
           latency: dbHealth.latency?.redis
+        },
+        rateLimiter: {
+          status: 'active',
+          backend: dbHealth.redis ? 'redis' : 'in-memory'
         }
       },
       consciousness: {
@@ -289,6 +306,37 @@ app.get("/ws/status", (c) => {
     connectedDevices: wsServer.getConnectedDevices().length,
     uptime: process.uptime()
   });
+});
+
+// Rate limiter status endpoint
+app.get("/rate-limit/status/:deviceId", async (c) => {
+  try {
+    const deviceId = c.req.param('deviceId');
+    const { getRateLimiter } = await import('./middleware/rate-limiter');
+    const rateLimiter = getRateLimiter();
+    
+    if (!rateLimiter) {
+      return c.json({
+        error: 'Rate limiter not initialized',
+        timestamp: Date.now()
+      }, 503);
+    }
+    
+    const status = await rateLimiter.getStatus(deviceId);
+    
+    return c.json({
+      deviceId,
+      timestamp: Date.now(),
+      rateLimits: status
+    });
+  } catch (error: any) {
+    console.error('Failed to get rate limit status:', error);
+    return c.json({
+      error: 'Failed to retrieve rate limit status',
+      timestamp: Date.now(),
+      details: error.message
+    }, 500);
+  }
 });
 
 // Export both the app and WebSocket initialization function

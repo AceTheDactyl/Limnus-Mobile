@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { publicProcedure } from "../../../create-context";
+import { protectedProcedure } from "../../../create-context";
 import { fieldManager } from "@/backend/infrastructure/field-manager";
+import { withChatLimit } from "@/backend/middleware/rate-limiter";
 
 const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),
@@ -14,7 +15,8 @@ const sendMessageSchema = z.object({
   messages: z.array(messageSchema).optional(),
 });
 
-export const sendMessageProcedure = publicProcedure
+export const sendMessageProcedure = protectedProcedure
+  .use(withChatLimit)
   .input(sendMessageSchema)
   .mutation(async ({ input }) => {
     const { message, conversationId } = input;

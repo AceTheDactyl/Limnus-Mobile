@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { publicProcedure } from "@/backend/trpc/create-context";
+import { protectedProcedure } from "@/backend/trpc/create-context";
 import { fieldManager } from "@/backend/infrastructure/field-manager";
+import { withBatchRateLimit } from "@/backend/middleware/rate-limiter";
 
 const syncEventSchema = z.object({
   deviceId: z.string(),
@@ -12,7 +13,8 @@ const syncEventSchema = z.object({
   }))
 });
 
-export const syncProcedure = publicProcedure
+export const syncProcedure = protectedProcedure
+  .use(withBatchRateLimit('sync_batch', 1))
   .input(syncEventSchema)
   .mutation(async ({ input }: { input: z.infer<typeof syncEventSchema> }) => {
     const { deviceId, events } = input;

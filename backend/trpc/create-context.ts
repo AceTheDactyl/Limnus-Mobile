@@ -2,12 +2,14 @@ import { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import { initTRPC } from "@trpc/server";
 import superjson from "superjson";
 import { deviceAuthMiddleware } from '../auth/device-auth-middleware';
+import { getRateLimiter } from '../middleware/rate-limiter';
 
 // Context creation function
 export const createContext = async (opts: FetchCreateContextFnOptions) => {
   return {
     req: opts.req,
     device: null as any, // Will be populated by auth middleware
+    rateLimiter: getRateLimiter(), // Add rate limiter to context
   };
 };
 
@@ -23,3 +25,6 @@ export const publicProcedure = t.procedure;
 
 // Protected procedure that requires authentication
 export const protectedProcedure = t.procedure.use(deviceAuthMiddleware.createAuthMiddleware());
+
+// Rate-limited procedure that includes both auth and rate limiting
+export const rateLimitedProcedure = protectedProcedure; // Base for rate-limited procedures

@@ -3,6 +3,7 @@ import { protectedProcedure } from "@/backend/trpc/create-context";
 import { fieldManager } from "@/backend/infrastructure/field-manager";
 import { getConsciousnessMetrics, measureExecutionTime } from "@/backend/monitoring/consciousness-metrics";
 import { deviceAuthMiddleware } from "@/backend/auth/device-auth-middleware";
+import { withFieldUpdateLimit } from "@/backend/middleware/rate-limiter";
 
 const resonanceFieldSchema = z.object({
   intensity: z.number().min(0).max(1),
@@ -255,6 +256,7 @@ function calculateBreathCoherence(breathEvents: any[]): number {
 }
 
 export const fieldProcedure = protectedProcedure
+  .use(withFieldUpdateLimit)
   .input(resonanceFieldSchema)
   .mutation(async ({ input, ctx }: { input: z.infer<typeof resonanceFieldSchema>; ctx: any }) => {
     const { intensity, x, y } = input;
