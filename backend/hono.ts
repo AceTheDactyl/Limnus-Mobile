@@ -53,7 +53,9 @@ const initializeDatabase = async () => {
           console.warn('⚠️ Failed to import Redis instance:', error);
         }
       }
-      initializeRateLimiter(redis);
+      // Initialize rate limiter (singleton pattern handles Redis automatically)
+      initializeRateLimiter();
+      console.log(`🛡️ Rate limiter initialized with ${redis ? 'Redis' : 'in-memory'} backend`);
       
       // Initialize metrics collector
       const metricsCollector = getMetricsCollector();

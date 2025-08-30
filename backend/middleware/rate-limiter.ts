@@ -1,97 +1,127 @@
 import { RateLimiterMemory, RateLimiterRedis } from 'rate-limiter-flexible';
 import { TRPCError } from '@trpc/server';
+import { redis } from '../infrastructure/database';
 
-export class ConsciousnessRateLimiter {
+class ConsciousnessRateLimiter {
   private limiters: Map<string, RateLimiterMemory | RateLimiterRedis>;
-  private redis: any;
+  private static instance: ConsciousnessRateLimiter;
   
-  constructor(redis?: any) {
-    this.redis = redis;
-    const LimiterClass = redis ? RateLimiterRedis : RateLimiterMemory;
+  constructor() {
+    this.limiters = new Map();
     
-    this.limiters = new Map([
-      ['field_update', new LimiterClass({
+    if (redis) {
+      this.limiters.set('field_update', new RateLimiterRedis({
         storeClient: redis,
-        points: 30,      // 30 field updates
-        duration: 60,    // per minute
-        blockDuration: 10, // block for 10 seconds
-        keyPrefix: 'rl_field_'
-      })],
-      ['sacred_phrase', new LimiterClass({
+        keyPrefix: 'rl:field',
+        points: 30,
+        duration: 60,
+        blockDuration: 10
+      }));
+      this.limiters.set('sacred_phrase', new RateLimiterRedis({
         storeClient: redis,
-        points: 5,       // 5 sacred phrases
-        duration: 60,    // per minute
-        blockDuration: 60, // block for 1 minute
-        keyPrefix: 'rl_sacred_'
-      })],
-      ['sync_batch', new LimiterClass({
+        keyPrefix: 'rl:sacred',
+        points: 5,
+        duration: 60,
+        blockDuration: 60
+      }));
+      this.limiters.set('sync_batch', new RateLimiterRedis({
         storeClient: redis,
-        points: 10,      // 10 batch syncs
-        duration: 60,    // per minute
-        blockDuration: 30, // block for 30 seconds
-        keyPrefix: 'rl_sync_'
-      })],
-      ['entanglement', new LimiterClass({
+        keyPrefix: 'rl:sync',
+        points: 10,
+        duration: 60,
+        blockDuration: 30
+      }));
+      this.limiters.set('entanglement', new RateLimiterRedis({
         storeClient: redis,
-        points: 3,       // 3 entanglements
-        duration: 300,   // per 5 minutes
-        blockDuration: 120, // block for 2 minutes
-        keyPrefix: 'rl_entangle_'
-      })],
-      ['room64_action', new LimiterClass({
+        keyPrefix: 'rl:entangle',
+        points: 3,
+        duration: 300,
+        blockDuration: 120
+      }));
+      this.limiters.set('room64_action', new RateLimiterRedis({
         storeClient: redis,
-        points: 20,      // 20 room actions
-        duration: 60,    // per minute
-        blockDuration: 15, // block for 15 seconds
-        keyPrefix: 'rl_room64_'
-      })],
-      ['archaeology', new LimiterClass({
+        keyPrefix: 'rl:room64',
+        points: 20,
+        duration: 60,
+        blockDuration: 15
+      }));
+      this.limiters.set('archaeology', new RateLimiterRedis({
         storeClient: redis,
-        points: 10,      // 10 archaeology queries
-        duration: 300,   // per 5 minutes
-        blockDuration: 60, // block for 1 minute
-        keyPrefix: 'rl_arch_'
-      })],
-      ['chat_message', new LimiterClass({
+        keyPrefix: 'rl:arch',
+        points: 10,
+        duration: 300,
+        blockDuration: 60
+      }));
+      this.limiters.set('chat_message', new RateLimiterRedis({
         storeClient: redis,
-        points: 20,      // 20 chat messages
-        duration: 60,    // per minute
-        blockDuration: 30, // block for 30 seconds
-        keyPrefix: 'rl_chat_'
-      })]
-    ]);
-    
-    console.log(`🛡️ Rate limiter initialized with ${redis ? 'Redis' : 'in-memory'} backend`);
+        keyPrefix: 'rl:chat',
+        points: 20,
+        duration: 60,
+        blockDuration: 30
+      }));
+    } else {
+      this.limiters.set('field_update', new RateLimiterMemory({
+        keyPrefix: 'rl:field',
+        points: 30,
+        duration: 60,
+        blockDuration: 10
+      }));
+      this.limiters.set('sacred_phrase', new RateLimiterMemory({
+        keyPrefix: 'rl:sacred',
+        points: 5,
+        duration: 60,
+        blockDuration: 60
+      }));
+      this.limiters.set('sync_batch', new RateLimiterMemory({
+        keyPrefix: 'rl:sync',
+        points: 10,
+        duration: 60,
+        blockDuration: 30
+      }));
+      this.limiters.set('entanglement', new RateLimiterMemory({
+        keyPrefix: 'rl:entangle',
+        points: 3,
+        duration: 300,
+        blockDuration: 120
+      }));
+      this.limiters.set('room64_action', new RateLimiterMemory({
+        keyPrefix: 'rl:room64',
+        points: 20,
+        duration: 60,
+        blockDuration: 15
+      }));
+      this.limiters.set('archaeology', new RateLimiterMemory({
+        keyPrefix: 'rl:arch',
+        points: 10,
+        duration: 300,
+        blockDuration: 60
+      }));
+      this.limiters.set('chat_message', new RateLimiterMemory({
+        keyPrefix: 'rl:chat',
+        points: 20,
+        duration: 60,
+        blockDuration: 30
+      }));
+    }
   }
   
-  async consume(key: string, deviceId: string, points = 1): Promise<void> {
-    const limiter = this.limiters.get(key);
-    if (!limiter) {
-      console.warn(`⚠️ No rate limiter found for key: ${key}`);
-      return;
+  static getInstance() {
+    if (!this.instance) {
+      this.instance = new ConsciousnessRateLimiter();
     }
+    return this.instance;
+  }
+  
+  async consume(key: string, deviceId: string, points = 1) {
+    const limiter = this.limiters.get(key);
+    if (!limiter) return;
     
     try {
-      const rateLimitKey = `${key}:${deviceId}`;
-      await limiter.consume(rateLimitKey, points);
-      
-      // Log successful consumption for monitoring
-      console.log(`✅ Rate limit check passed for ${deviceId} on ${key} (consumed ${points} points)`);
+      await limiter.consume(`${deviceId}:${key}`, points);
     } catch (rejRes: any) {
-      console.warn(`🚫 Rate limit exceeded for ${deviceId} on ${key}:`, {
-        totalHits: rejRes.totalHits,
-        remainingPoints: rejRes.remainingPoints,
-        msBeforeNext: rejRes.msBeforeNext
-      });
-      
       throw new TRPCError({
         code: 'TOO_MANY_REQUESTS',
-        message: `Rate limit exceeded for ${key}. Try again in ${Math.ceil(rejRes.msBeforeNext / 1000)} seconds.`,
-        cause: {
-          retryAfter: rejRes.msBeforeNext,
-          remainingPoints: rejRes.remainingPoints,
-          totalHits: rejRes.totalHits
-        }
+        message: `Rate limit exceeded. Retry after ${Math.round(rejRes.msBeforeNext / 1000)}s`
       });
     }
   }
@@ -143,23 +173,14 @@ export class ConsciousnessRateLimiter {
   }
 }
 
-// Integration with existing procedures
-export const withRateLimit = (key: string, points = 1) => {
+// Middleware factory
+export const withRateLimit = (limitKey: string) => {
   return async ({ ctx, next, rawInput }: { ctx: any; next: any; rawInput: any }) => {
-    const limiter = ctx.rateLimiter as ConsciousnessRateLimiter;
+    const rateLimiter = ConsciousnessRateLimiter.getInstance();
     const deviceId = rawInput?.deviceId || ctx.device?.deviceId;
     
-    if (!deviceId) {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: 'Device ID is required for rate limiting'
-      });
-    }
-    
-    if (limiter) {
-      await limiter.consume(key, deviceId, points);
-    } else {
-      console.warn('⚠️ Rate limiter not available in context');
+    if (deviceId) {
+      await rateLimiter.consume(limitKey, deviceId);
     }
     
     return next();
@@ -198,16 +219,11 @@ export const withBatchRateLimit = (key: string, pointsPerItem = 1) => {
   };
 };
 
-// Singleton instance
-let rateLimiterInstance: ConsciousnessRateLimiter | null = null;
-
+// Legacy compatibility functions
 export function initializeRateLimiter(redis?: any): ConsciousnessRateLimiter {
-  if (!rateLimiterInstance) {
-    rateLimiterInstance = new ConsciousnessRateLimiter(redis);
-  }
-  return rateLimiterInstance;
+  return ConsciousnessRateLimiter.getInstance();
 }
 
 export function getRateLimiter(): ConsciousnessRateLimiter | null {
-  return rateLimiterInstance;
+  return ConsciousnessRateLimiter.getInstance();
 }
