@@ -4,40 +4,122 @@ import { TRPCError } from '@trpc/server';
 
 // Enhanced schemas for existing routes
 export const FieldUpdateSchema = z.object({
-  deviceId: z.string().uuid(),
-  intensity: z.number().min(0).max(1).refine(n => !isNaN(n)),
-  x: z.number().min(0).max(29).optional(),
-  y: z.number().min(0).max(29).optional()
-}).transform(data => ({
-  ...data,
-  intensity: Math.round(data.intensity * 100) / 100 // Limit precision
-}));
-
-export const SyncEventSchema = z.object({
-  type: z.enum(['BREATH', 'SPIRAL', 'BLOOM', 'TOUCH', 'SACRED_PHRASE', 'OFFLINE_SYNC']),
-  timestamp: z.number().min(Date.now() - 86400000), // Max 24h old
-  data: z.object({
-    intensity: z.number().min(0).max(1).optional(),
-    x: z.number().min(0).max(29).optional(),
-    y: z.number().min(0).max(29).optional(),
-    phrase: z.string().max(200).transform(str => 
-      DOMPurify.sanitize(str, { ALLOWED_TAGS: [] })
-    ).optional(),
-    breathingPhase: z.number().min(0).max(360).optional()
-  })
+  deviceId: z.string().uuid('Invalid device ID format'),
+  intensity: z.number()
+    .min(0, 'Intensity must be at least 0')
+    .max(1, 'Intensity cannot exceed 1')
+    .refine(n => !isNaN(n), 'Intensity must be a valid number')
+    .transform(n => Math.round(n * 100) / 100),
+  x: z.number().int().min(0).max(29).optional(),
+  y: z.number().int().min(0).max(29).optional()
 });
 
+// Discriminated union for better type safety and validation
+export const ConsciousnessEventSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('BREATH'),
+    timestamp: z.number().refine(
+      ts => ts > Date.now() - 86400000,
+      'Event timestamp too old (max 24h)'
+    ),
+    data: z.object({
+      intensity: z.number().min(0).max(1).optional(),
+      breathingPhase: z.number().min(0).max(360).optional()
+    })
+  }),
+  z.object({
+    type: z.literal('SACRED_PHRASE'),
+    timestamp: z.number().refine(
+      ts => ts > Date.now() - 86400000,
+      'Event timestamp too old (max 24h)'
+    ),
+    data: z.object({
+      phrase: z.string()
+        .min(1, 'Sacred phrase cannot be empty')
+        .max(200, 'Sacred phrase too long')
+        .transform(str => DOMPurify.sanitize(str, { ALLOWED_TAGS: [] })),
+      intensity: z.number().min(0).max(1).default(0.7),
+      x: z.number().int().min(0).max(29).optional(),
+      y: z.number().int().min(0).max(29).optional()
+    })
+  }),
+  z.object({
+    type: z.literal('SPIRAL'),
+    timestamp: z.number().refine(
+      ts => ts > Date.now() - 86400000,
+      'Event timestamp too old (max 24h)'
+    ),
+    data: z.object({
+      x: z.number().int().min(0).max(29),
+      y: z.number().int().min(0).max(29),
+      intensity: z.number().min(0).max(1)
+    })
+  }),
+  z.object({
+    type: z.literal('BLOOM'),
+    timestamp: z.number().refine(
+      ts => ts > Date.now() - 86400000,
+      'Event timestamp too old (max 24h)'
+    ),
+    data: z.object({
+      intensity: z.number().min(0).max(1).default(1.0)
+    })
+  }),
+  z.object({
+    type: z.literal('TOUCH'),
+    timestamp: z.number().refine(
+      ts => ts > Date.now() - 86400000,
+      'Event timestamp too old (max 24h)'
+    ),
+    data: z.object({
+      x: z.number().int().min(0).max(29).optional(),
+      y: z.number().int().min(0).max(29).optional(),
+      intensity: z.number().min(0).max(1)
+    })
+  }),
+  z.object({
+    type: z.literal('OFFLINE_SYNC'),
+    timestamp: z.number().refine(
+      ts => ts > Date.now() - 86400000,
+      'Event timestamp too old (max 24h)'
+    ),
+    data: z.object({
+      eventCount: z.number().int().min(1).optional(),
+      lastSyncTime: z.number().optional()
+    })
+  })
+]);
+
+// Legacy schema for backward compatibility
+export const SyncEventSchema = ConsciousnessEventSchema;
+
 export const BatchSyncSchema = z.object({
-  deviceId: z.string().uuid(),
-  events: z.array(SyncEventSchema).max(50) // Limit batch size
+  deviceId: z.string().uuid('Invalid device ID format'),
+  events: z.array(ConsciousnessEventSchema)
+    .min(1, 'At least one event required')
+    .max(50, 'Too many events in batch (max 50)')
+    .refine(
+      events => {
+        const now = Date.now();
+        return events.every(e => e.timestamp <= now + 60000); // Allow 1min future
+      },
+      'Events cannot be too far in the future'
+    )
 });
 
 export const EntanglementSchema = z.object({
-  deviceId: z.string().uuid(),
-  targetDeviceId: z.string().uuid().optional(),
-  entanglementType: z.enum(['BREATHING', 'RESONANCE', 'SACRED_PHRASE']),
-  intensity: z.number().min(0).max(1)
-});
+  deviceId: z.string().uuid('Invalid device ID format'),
+  targetDeviceId: z.string().uuid('Invalid target device ID format').optional(),
+  entanglementType: z.enum(['BREATHING', 'RESONANCE', 'SACRED_PHRASE'], {
+    message: 'Invalid entanglement type'
+  }),
+  intensity: z.number()
+    .min(0, 'Intensity must be at least 0')
+    .max(1, 'Intensity cannot exceed 1')
+}).refine(
+  data => data.deviceId !== data.targetDeviceId,
+  'Cannot entangle device with itself'
+);
 
 export const Room64Schema = z.object({
   deviceId: z.string().uuid(),
@@ -100,29 +182,44 @@ export const VerifyTokenSchema = z.object({
   deviceId: z.string().uuid()
 });
 
-// Validation middleware
+// Enhanced validation middleware with better error handling
 export const validateInput = (schema: z.ZodSchema) => {
   return async ({ ctx, next, rawInput }: any) => {
     try {
-      const validated = schema.parse(rawInput);
-      ctx.input = validated; // Use validated input
-      return next();
+      const validated = await schema.parseAsync(rawInput);
+      // Pass validated input to next middleware
+      ctx.validatedInput = validated;
+      return next({ 
+        ctx: { ...ctx, rawInput: validated } 
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
+        const formattedErrors = error.issues.map((e: any) => {
+          const path = e.path.length > 0 ? e.path.join('.') : 'root';
+          return `${path}: ${e.message}`;
+        }).join('; ');
+        
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Invalid input: ' + error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', '),
-          cause: error
+          message: `Validation failed: ${formattedErrors}`,
+          cause: error.flatten()
         });
       }
       throw new TRPCError({
         code: 'BAD_REQUEST',
-        message: 'Invalid input',
+        message: 'Invalid input format',
         cause: error
       });
     }
   };
 };
+
+// Specialized validation for different input types
+export const validateFieldInput = validateInput(FieldUpdateSchema);
+export const validateBatchSync = validateInput(BatchSyncSchema);
+export const validateEntanglement = validateInput(EntanglementSchema);
+export const validateRoom64 = validateInput(Room64Schema);
+export const validateArchaeology = validateInput(ArchaeologySchema);
 
 // Sanitization helpers
 export const sanitizeText = (text: string, maxLength = 1000): string => {
@@ -177,10 +274,40 @@ export const validateBatchSize = (items: any[], maxSize = 50): any[] => {
   return items;
 };
 
+// Type inference helpers
+export type FieldUpdateInput = z.infer<typeof FieldUpdateSchema>;
+export type ConsciousnessEventInput = z.infer<typeof ConsciousnessEventSchema>;
+export type BatchSyncInput = z.infer<typeof BatchSyncSchema>;
+export type EntanglementInput = z.infer<typeof EntanglementSchema>;
+export type Room64Input = z.infer<typeof Room64Schema>;
+export type ArchaeologyInput = z.infer<typeof ArchaeologySchema>;
+
+// Enhanced validation helpers
+export const validateEventBatch = (events: unknown[]): ConsciousnessEventInput[] => {
+  if (!Array.isArray(events)) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Events must be an array'
+    });
+  }
+  
+  return events.map((event, index) => {
+    try {
+      return ConsciousnessEventSchema.parse(event);
+    } catch (error) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Invalid event at index ${index}: ${error instanceof z.ZodError ? error.issues[0]?.message : 'Unknown error'}`
+      });
+    }
+  });
+};
+
 // Export all schemas as a collection for easy import
 export const ConsciousnessSchemas = {
   FieldUpdate: FieldUpdateSchema,
-  SyncEvent: SyncEventSchema,
+  ConsciousnessEvent: ConsciousnessEventSchema,
+  SyncEvent: SyncEventSchema, // Legacy
   BatchSync: BatchSyncSchema,
   Entanglement: EntanglementSchema,
   Room64: Room64Schema,
