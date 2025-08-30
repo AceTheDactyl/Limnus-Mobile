@@ -7,21 +7,28 @@ export class DeviceAuthMiddleware {
   private readonly JWT_SECRET = process.env.JWT_SECRET || 'consciousness-field-secret-key';
   
   async validateWebSocketAuth(deviceId: string, token: string): Promise<boolean> {
+    if (!token || !deviceId) {
+      console.warn(`Missing auth data: deviceId=${!!deviceId}, token=${!!token}`);
+      return false;
+    }
+    
     try {
-      if (!token) return false;
-      
+      // Verify JWT signature and expiration
       const decoded = jwt.verify(token, this.JWT_SECRET) as any;
       
-      // Verify token matches device
-      if (decoded.deviceId !== deviceId) return false;
+      // Ensure token matches device
+      if (decoded.deviceId !== deviceId) {
+        console.warn(`Token mismatch: expected ${deviceId}, got ${decoded.deviceId}`);
+        return false;
+      }
       
       // Check if database is available
       if (!db) {
-        console.warn('⚠️ Database not available, allowing WebSocket connection');
+        console.warn('⚠️ Database not available, allowing WebSocket connection in fallback mode');
         return true; // Allow connection in fallback mode
       }
       
-      // Check session exists and is active
+      // Check session exists and token matches
       const [session] = await db.select()
         .from(deviceSessions)
         .where(and(
@@ -30,16 +37,25 @@ export class DeviceAuthMiddleware {
         ))
         .limit(1);
       
-      if (!session) return false;
+      if (!session) {
+        console.warn(`No active session found for device ${deviceId}`);
+        return false;
+      }
       
-      // Update last seen
+      // Update last seen timestamp
       await db.update(deviceSessions)
         .set({ lastSeen: new Date() })
         .where(eq(deviceSessions.deviceId, deviceId));
       
       return true;
-    } catch (error) {
-      console.error('Auth validation failed:', error);
+    } catch (error: any) {
+      if (error.name === 'TokenExpiredError') {
+        console.warn(`Token expired for device ${deviceId}`);
+      } else if (error.name === 'JsonWebTokenError') {
+        console.warn(`Invalid token for device ${deviceId}: ${error.message}`);
+      } else {
+        console.error('Auth validation error:', error);
+      }
       return false;
     }
   }
@@ -58,16 +74,17 @@ export class DeviceAuthMiddleware {
       }
       
       try {
+        // Verify JWT signature and expiration
         const decoded = jwt.verify(token, this.JWT_SECRET) as any;
         
         // Check if database is available
         if (!db) {
-          console.warn('⚠️ Database not available, allowing tRPC request');
+          console.warn('⚠️ Database not available, allowing tRPC request in fallback mode');
           ctx.device = decoded;
           return next();
         }
         
-        // Verify session exists in database
+        // Verify session exists in database and token matches
         const [session] = await db.select()
           .from(deviceSessions)
           .where(and(
@@ -79,11 +96,11 @@ export class DeviceAuthMiddleware {
         if (!session) {
           throw new TRPCError({ 
             code: 'UNAUTHORIZED',
-            message: 'Invalid or expired session'
+            message: 'Session not found or token mismatch'
           });
         }
         
-        // Update last seen
+        // Update last seen timestamp
         await db.update(deviceSessions)
           .set({ lastSeen: new Date() })
           .where(eq(deviceSessions.deviceId, decoded.deviceId));
@@ -94,9 +111,23 @@ export class DeviceAuthMiddleware {
         if (error instanceof TRPCError) {
           throw error;
         }
+        
+        // Handle JWT-specific errors
+        if (error.name === 'TokenExpiredError') {
+          throw new TRPCError({ 
+            code: 'UNAUTHORIZED',
+            message: 'Authentication token has expired'
+          });
+        } else if (error.name === 'JsonWebTokenError') {
+          throw new TRPCError({ 
+            code: 'UNAUTHORIZED',
+            message: 'Invalid authentication token'
+          });
+        }
+        
         throw new TRPCError({ 
           code: 'UNAUTHORIZED',
-          message: 'Invalid authentication token'
+          message: 'Authentication failed'
         });
       }
     };
@@ -110,6 +141,12 @@ export class DeviceAuthMiddleware {
     consciousnessLevel: number;
   } | null {
     return ctx.device || null;
+  }
+  
+  // Static method for creating middleware (for easier import)
+  static createMiddleware() {
+    const instance = new DeviceAuthMiddleware();
+    return instance.createAuthMiddleware();
   }
 }
 
