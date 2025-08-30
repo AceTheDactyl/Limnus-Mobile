@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { publicProcedure } from "@/backend/trpc/create-context";
+import { protectedProcedure } from "@/backend/trpc/create-context";
 import { fieldManager } from "@/backend/infrastructure/field-manager";
 import { getConsciousnessMetrics, measureExecutionTime } from "@/backend/monitoring/consciousness-metrics";
+import { deviceAuthMiddleware } from "@/backend/auth/device-auth-middleware";
 
 const resonanceFieldSchema = z.object({
-  deviceId: z.string(),
   intensity: z.number().min(0).max(1),
   x: z.number().optional(),
   y: z.number().optional(),
@@ -12,17 +12,18 @@ const resonanceFieldSchema = z.object({
 
 // Enhanced consciousness snapshot schema for AI integration
 const snapshotSchema = z.object({
-  deviceId: z.string().optional(),
   includeArchaeology: z.boolean().optional().default(false),
   includeVectors: z.boolean().optional().default(true),
   eventLimit: z.number().optional().default(30)
 });
 
 // Enhanced consciousness snapshot query for AI integration with vector analysis
-export const snapshotProcedure = publicProcedure
+export const snapshotProcedure = protectedProcedure
   .input(snapshotSchema)
-  .query(async ({ input }: { input: z.infer<typeof snapshotSchema> }) => {
-    const { deviceId, includeArchaeology, includeVectors, eventLimit } = input;
+  .query(async ({ input, ctx }: { input: z.infer<typeof snapshotSchema>; ctx: any }) => {
+    const { includeArchaeology, includeVectors, eventLimit } = input;
+    const device = deviceAuthMiddleware.getDeviceFromContext(ctx);
+    const deviceId = device?.deviceId;
     const metrics = getConsciousnessMetrics();
     
     console.log(`Enhanced consciousness snapshot requested by ${deviceId || 'anonymous'}`);
@@ -253,10 +254,12 @@ function calculateBreathCoherence(breathEvents: any[]): number {
   return Math.max(0, 1 - (Math.sqrt(variance) / avgInterval));
 }
 
-export const fieldProcedure = publicProcedure
+export const fieldProcedure = protectedProcedure
   .input(resonanceFieldSchema)
-  .mutation(async ({ input }: { input: z.infer<typeof resonanceFieldSchema> }) => {
-    const { deviceId, intensity, x, y } = input;
+  .mutation(async ({ input, ctx }: { input: z.infer<typeof resonanceFieldSchema>; ctx: any }) => {
+    const { intensity, x, y } = input;
+    const device = deviceAuthMiddleware.getDeviceFromContext(ctx);
+    const deviceId = device?.deviceId || 'unknown';
     const metrics = getConsciousnessMetrics();
     
     console.log(`Resonance field update from ${deviceId}:`, { intensity, x, y });

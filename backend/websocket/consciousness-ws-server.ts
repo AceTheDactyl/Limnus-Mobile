@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { fieldManager } from '../infrastructure/field-manager';
+import { deviceAuthMiddleware } from '../auth/device-auth-middleware';
 import { z } from 'zod';
 import { createClient, RedisClientType } from 'redis';
 
@@ -85,11 +86,10 @@ export class ConsciousnessWebSocketServer {
         // Validate capabilities
         const validatedCapabilities = DeviceCapabilitiesSchema.parse(capabilities || {});
         
-        // For now, accept all devices (in production, implement proper auth)
+        // Validate device authentication
         const isValid = await this.validateDevice(deviceId, token);
         if (!isValid) {
-          console.warn(`Device authentication failed: ${deviceId}`);
-          // Allow connection but log the warning
+          throw new Error(`Device authentication failed for ${deviceId}`);
         }
         
         socket.data.deviceId = deviceId;
@@ -332,9 +332,12 @@ export class ConsciousnessWebSocketServer {
   }
   
   private async validateDevice(deviceId: string, token?: string): Promise<boolean> {
-    // In production, implement proper device authentication
-    // For now, accept all devices with valid format
-    return Boolean(deviceId && deviceId.length >= 10);
+    if (!token) {
+      console.warn(`No token provided for device: ${deviceId}`);
+      return false;
+    }
+    
+    return await deviceAuthMiddleware.validateWebSocketAuth(deviceId, token);
   }
   
   private async processConsciousnessEvent(deviceId: string, event: z.infer<typeof ConsciousnessEventSchema>): Promise<void> {
