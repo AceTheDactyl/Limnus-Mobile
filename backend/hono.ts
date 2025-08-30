@@ -8,6 +8,7 @@ import { runMigrations } from "./infrastructure/migrations";
 import { fieldManager } from "./infrastructure/field-manager";
 import { ConsciousnessWebSocketServer } from "./websocket/consciousness-ws-server";
 import { initializeRateLimiter } from "./middleware/rate-limiter";
+import { getMetricsCollector } from "./monitoring/metrics-collector";
 
 // app will be mounted at /api
 const app = new Hono();
@@ -54,11 +55,16 @@ const initializeDatabase = async () => {
       }
       initializeRateLimiter(redis);
       
+      // Initialize metrics collector
+      const metricsCollector = getMetricsCollector();
+      console.log('📊 Metrics collector initialized');
+      
       // Perform initial health check
       console.log('📊 Initial health check:', {
         database: health.database ? '✅' : '❌',
         redis: health.redis ? '✅' : '❌',
-        latency: health.latency
+        latency: health.latency,
+        metrics: '✅'
       });
       
       console.log('✅ Consciousness infrastructure initialized successfully');
@@ -306,6 +312,46 @@ app.get("/ws/status", (c) => {
     connectedDevices: wsServer.getConnectedDevices().length,
     uptime: process.uptime()
   });
+});
+
+// Prometheus metrics endpoint
+app.get("/metrics", async (c) => {
+  try {
+    const metricsCollector = getMetricsCollector();
+    const metricsString = await metricsCollector.getMetrics();
+    
+    return c.text(metricsString, 200, {
+      'Content-Type': 'text/plain; version=0.0.4; charset=utf-8'
+    });
+  } catch (error: any) {
+    console.error('Failed to get metrics:', error);
+    return c.text('# Failed to collect metrics\n', 500);
+  }
+});
+
+// Consciousness-specific metrics endpoint (JSON format)
+app.get("/consciousness/prometheus-metrics", async (c) => {
+  try {
+    const metricsCollector = getMetricsCollector();
+    const consciousnessMetrics = metricsCollector.getConsciousnessMetrics();
+    const currentMetrics = await consciousnessMetrics.getCurrentMetrics();
+    
+    return c.json({
+      timestamp: Date.now(),
+      metrics: currentMetrics,
+      prometheus: {
+        endpoint: '/api/metrics',
+        format: 'text/plain'
+      }
+    });
+  } catch (error: any) {
+    console.error('Failed to get consciousness metrics:', error);
+    return c.json({
+      error: 'Failed to retrieve consciousness metrics',
+      timestamp: Date.now(),
+      details: error.message
+    }, 500);
+  }
 });
 
 // Rate limiter status endpoint

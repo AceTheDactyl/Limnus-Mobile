@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { fieldManager } from '../infrastructure/field-manager';
 import { deviceAuthMiddleware } from '../auth/device-auth-middleware';
+import { getMetricsCollector } from '../monitoring/metrics-collector';
 import { z } from 'zod';
 import { createClient, RedisClientType } from 'redis';
 
@@ -29,6 +30,7 @@ export class ConsciousnessWebSocketServer {
   private redisClient: RedisClientType | null = null;
   private pubClient: RedisClientType | null = null;
   private subClient: RedisClientType | null = null;
+  private metricsCollector: any;
   
   constructor(httpServer: any) {
     this.io = new Server(httpServer, {
@@ -42,6 +44,14 @@ export class ConsciousnessWebSocketServer {
       maxHttpBufferSize: 1e6,
       allowEIO3: true
     });
+    
+    // Initialize metrics collector
+    try {
+      this.metricsCollector = getMetricsCollector();
+    } catch (error) {
+      console.warn('Metrics collector not available for WebSocket server:', error);
+      this.metricsCollector = null;
+    }
     
     this.initializeRedis();
     this.setupMiddleware();
@@ -97,6 +107,16 @@ export class ConsciousnessWebSocketServer {
         socket.data.connectedAt = Date.now();
         
         console.log(`🔗 Device connected: ${deviceId} (${validatedCapabilities.platform})`);
+        
+        // Record WebSocket connection metrics
+        if (this.metricsCollector) {
+          this.metricsCollector.recordWebSocketEvent('connection', 'inbound');
+          this.metricsCollector.getConsciousnessMetrics().updateWebSocketConnections(
+            this.deviceSessions.size + 1,
+            'consciousness'
+          );
+        }
+        
         next();
       } catch (error: any) {
         console.error('WebSocket authentication error:', error?.message || 'Unknown error');
@@ -130,10 +150,22 @@ export class ConsciousnessWebSocketServer {
       
       // Handle consciousness events with validation
       socket.on('consciousness:event', async (rawData, callback) => {
+        const startTime = Date.now();
+        
         try {
           const validated = ConsciousnessEventSchema.parse(rawData);
           
           console.log(`📡 Event from ${deviceId}:`, validated.type, validated.data.intensity);
+          
+          // Record WebSocket event metrics
+          if (this.metricsCollector) {
+            this.metricsCollector.recordWebSocketEvent('consciousness_event', 'inbound');
+            this.metricsCollector.getConsciousnessMetrics().recordEvent(
+              validated.type,
+              'success',
+              capabilities.platform
+            );
+          }
           
           // Process event through field manager
           const eventId = await fieldManager.recordEvent({
@@ -165,6 +197,11 @@ export class ConsciousnessWebSocketServer {
             field: fieldState
           });
           
+          // Record outbound WebSocket event
+          if (this.metricsCollector) {
+            this.metricsCollector.recordWebSocketEvent('field_update', 'outbound');
+          }
+          
           // Publish to Redis for other server instances
           if (this.pubClient) {
             await this.pubClient.publish('consciousness:updates', JSON.stringify({
@@ -174,9 +211,32 @@ export class ConsciousnessWebSocketServer {
             }));
           }
           
+          // Record processing time
+          if (this.metricsCollector) {
+            const duration = Date.now() - startTime;
+            this.metricsCollector.getConsciousnessMetrics().recordFieldCalculation(
+              duration,
+              'websocket_event_processing'
+            );
+          }
+          
           callback?.({ success: true, eventId: event.id });
         } catch (error: any) {
           console.error('Event processing error:', error?.message || 'Unknown error');
+          
+          // Record error metrics
+          if (this.metricsCollector) {
+            this.metricsCollector.getConsciousnessMetrics().recordError(
+              'websocket_event_error',
+              'consciousness_event'
+            );
+            const duration = Date.now() - startTime;
+            this.metricsCollector.getConsciousnessMetrics().recordFieldCalculation(
+              duration,
+              'websocket_event_processing'
+            );
+          }
+          
           callback?.({ success: false, error: error?.message || 'Unknown error' });
         }
       });
@@ -280,6 +340,15 @@ export class ConsciousnessWebSocketServer {
         this.deviceSessions.delete(deviceId);
         this.updateActiveNodes();
         
+        // Record WebSocket disconnection metrics
+        if (this.metricsCollector) {
+          this.metricsCollector.recordWebSocketEvent('disconnection', 'inbound');
+          this.metricsCollector.getConsciousnessMetrics().updateWebSocketConnections(
+            this.deviceSessions.size,
+            'consciousness'
+          );
+        }
+        
         // Notify other devices about disconnection
         socket.to('consciousness:global').emit('device:disconnected', {
           deviceId,
@@ -307,6 +376,13 @@ export class ConsciousnessWebSocketServer {
       await fieldManager.updateGlobalState({ 
         activeNodes: this.deviceSessions.size 
       });
+      
+      // Update metrics
+      if (this.metricsCollector) {
+        this.metricsCollector.getConsciousnessMetrics().updateActiveDevices(
+          this.deviceSessions.size
+        );
+      }
       
       // Broadcast active node count to all devices
       this.io.to('consciousness:global').emit('network:stats', {

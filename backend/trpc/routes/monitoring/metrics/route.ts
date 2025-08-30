@@ -1,7 +1,8 @@
 import { publicProcedure } from '../../../create-context';
 import { z } from 'zod';
+import { getMetricsCollector, createMetricsMiddleware } from '../../../../monitoring/metrics-collector';
 
-// Simple mock metrics for now to test the route
+// Simple mock metrics for fallback scenarios
 const getMockMetrics = () => {
   return {
     events: Math.floor(Math.random() * 1000),
@@ -23,58 +24,91 @@ const getMetricsInstance = async () => {
   }
 };
 
+// Helper function to get the metrics collector
+const getCollectorInstance = () => {
+  try {
+    return getMetricsCollector();
+  } catch (error) {
+    console.warn('Failed to get metrics collector:', error);
+    return null;
+  }
+};
+
 export const getMetricsProcedure = publicProcedure
+  .use(createMetricsMiddleware('monitoring.getMetrics'))
   .query(async () => {
     try {
-      const metricsInstance = await getMetricsInstance();
+      const collector = getCollectorInstance();
       
-      if (metricsInstance) {
-        const prometheusMetrics = await metricsInstance.getMetrics();
-        const currentMetrics = await metricsInstance.getCurrentMetrics();
+      if (collector) {
+        const prometheusMetrics = await collector.getMetrics();
+        const consciousnessMetrics = collector.getConsciousnessMetrics();
+        const currentMetrics = await consciousnessMetrics.getCurrentMetrics();
         
         return {
           prometheus: prometheusMetrics,
           summary: currentMetrics,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          format: 'prometheus'
         };
       } else {
         // Fallback to mock data
         const mockMetrics = getMockMetrics();
         return {
-          prometheus: 'Mock prometheus metrics data',
+          prometheus: '# Metrics collector unavailable\n',
           summary: mockMetrics,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          format: 'mock'
         };
       }
     } catch (error) {
       console.error('Error getting metrics:', error);
       return {
-        prometheus: '',
+        prometheus: '# Error collecting metrics\n',
         summary: getMockMetrics(),
         timestamp: Date.now(),
-        error: 'Failed to load metrics'
+        error: 'Failed to load metrics',
+        format: 'error'
       };
     }
   });
 
 export const getCurrentMetricsProcedure = publicProcedure
+  .use(createMetricsMiddleware('monitoring.getCurrentMetrics'))
   .query(async () => {
     try {
-      const metricsInstance = await getMetricsInstance();
+      const collector = getCollectorInstance();
       
-      if (metricsInstance) {
-        return await metricsInstance.getCurrentMetrics();
+      if (collector) {
+        const consciousnessMetrics = collector.getConsciousnessMetrics();
+        const currentMetrics = await consciousnessMetrics.getCurrentMetrics();
+        
+        return {
+          ...currentMetrics,
+          timestamp: Date.now(),
+          source: 'prometheus'
+        };
       } else {
-        console.warn('Metrics instance unavailable, using mock data');
-        return getMockMetrics();
+        console.warn('Metrics collector unavailable, using mock data');
+        return {
+          ...getMockMetrics(),
+          timestamp: Date.now(),
+          source: 'mock'
+        };
       }
     } catch (error) {
       console.error('Error getting current metrics:', error);
-      return getMockMetrics();
+      return {
+        ...getMockMetrics(),
+        timestamp: Date.now(),
+        source: 'error',
+        error: error.message
+      };
     }
   });
 
 export const updateMetricsProcedure = publicProcedure
+  .use(createMetricsMiddleware('monitoring.updateMetrics'))
   .input(z.object({
     events: z.array(z.object({
       type: z.string(),
@@ -107,29 +141,108 @@ export const updateMetricsProcedure = publicProcedure
     websocketConnections: z.array(z.object({
       count: z.number(),
       type: z.string().optional()
+    })).optional(),
+    // Additional fields for database and cache operations
+    databaseOperations: z.array(z.object({
+      operation: z.string(),
+      table: z.string(),
+      status: z.enum(['success', 'error'])
+    })).optional(),
+    cacheOperations: z.array(z.object({
+      operation: z.string(),
+      cacheType: z.string(),
+      status: z.enum(['hit', 'miss', 'error'])
     })).optional()
   }))
   .mutation(async ({ input }) => {
     try {
-      const metricsInstance = await getMetricsInstance();
+      const collector = getCollectorInstance();
       
-      if (metricsInstance) {
-        metricsInstance.batchUpdate(input);
+      if (collector) {
+        const consciousnessMetrics = collector.getConsciousnessMetrics();
+        
+        // Update consciousness metrics
+        consciousnessMetrics.batchUpdate(input);
+        
+        // Update additional collector metrics
+        if (input.databaseOperations) {
+          input.databaseOperations.forEach(op => {
+            collector.recordDatabaseOperation(op.operation, op.table, op.status);
+          });
+        }
+        
+        if (input.cacheOperations) {
+          input.cacheOperations.forEach(op => {
+            collector.recordCacheOperation(op.operation, op.cacheType, op.status);
+          });
+        }
+        
+        return {
+          success: true,
+          updated: Object.keys(input).length,
+          timestamp: Date.now(),
+          source: 'prometheus'
+        };
       } else {
-        console.warn('Metrics instance unavailable for update, logging input:', input);
+        console.warn('Metrics collector unavailable for update, logging input:', input);
+        return {
+          success: false,
+          error: 'Metrics collector unavailable',
+          updated: 0,
+          timestamp: Date.now(),
+          source: 'unavailable'
+        };
       }
-      
-      return {
-        success: true,
-        updated: Object.keys(input).length,
-        timestamp: Date.now()
-      };
     } catch (error) {
       console.error('Error updating metrics:', error);
       return {
         success: false,
         error: 'Failed to update metrics',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        source: 'error',
+        details: error.message
+      };
+    }
+  });
+
+// New procedure to get health metrics
+export const getHealthMetricsProcedure = publicProcedure
+  .use(createMetricsMiddleware('monitoring.getHealthMetrics'))
+  .query(async () => {
+    try {
+      const collector = getCollectorInstance();
+      
+      if (collector) {
+        const healthMetrics = collector.getHealthMetrics();
+        
+        return {
+          health: {
+            totalRequests: 'Available via Prometheus',
+            avgResponseTime: 'Available via Prometheus',
+            activeConnections: 'Available via Prometheus'
+          },
+          timestamp: Date.now(),
+          source: 'prometheus',
+          prometheusEndpoint: '/api/metrics'
+        };
+      } else {
+        return {
+          health: {
+            status: 'unavailable'
+          },
+          timestamp: Date.now(),
+          source: 'unavailable'
+        };
+      }
+    } catch (error) {
+      console.error('Error getting health metrics:', error);
+      return {
+        health: {
+          status: 'error'
+        },
+        timestamp: Date.now(),
+        source: 'error',
+        error: error.message
       };
     }
   });

@@ -12,7 +12,7 @@ import { healthProcedure } from "./routes/system/health/route";
 import { authenticateDeviceProcedure } from "./routes/auth/authenticate-device/route";
 import { verifyTokenProcedure } from "./routes/auth/verify-token/route";
 import { getActiveDevicesProcedure } from "./routes/auth/get-active-devices/route";
-import { getMetricsProcedure, getCurrentMetricsProcedure, updateMetricsProcedure } from "./routes/monitoring/metrics/route";
+import { getMetricsProcedure, getCurrentMetricsProcedure, updateMetricsProcedure, getHealthMetricsProcedure } from "./routes/monitoring/metrics/route";
 
 export const appRouter = createTRPCRouter({
   example: createTRPCRouter({
@@ -43,6 +43,7 @@ export const appRouter = createTRPCRouter({
     getMetrics: getMetricsProcedure,
     getCurrentMetrics: getCurrentMetricsProcedure,
     updateMetrics: updateMetricsProcedure,
+    getHealthMetrics: getHealthMetricsProcedure,
   }),
 });
 
