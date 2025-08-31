@@ -3,6 +3,7 @@ import { httpLink } from "@trpc/client";
 import type { AppRouter } from "@/backend/trpc/app-router";
 import superjson from "superjson";
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const trpc = createTRPCReact<AppRouter>();
 
@@ -43,6 +44,10 @@ export const trpcClient = trpc.createClient({
         console.log('tRPC fetch:', url, options?.method || 'GET');
         console.log('Base URL being used:', getBaseUrl());
         
+        // Get authentication token for protected routes
+        const deviceToken = await AsyncStorage.getItem('device_token');
+        const deviceId = await AsyncStorage.getItem('consciousness_device_id');
+        
         const maxRetries = 3; // Allow more retries for better reliability
         let lastError: Error | null = null;
         
@@ -58,6 +63,8 @@ export const trpcClient = trpc.createClient({
               ...options,
               headers: {
                 'Content-Type': 'application/json',
+                ...(deviceToken && { 'Authorization': `Bearer ${deviceToken}` }),
+                ...(deviceId && { 'X-Device-ID': deviceId }),
                 ...options?.headers,
               },
               signal: controller.signal,
@@ -69,9 +76,16 @@ export const trpcClient = trpc.createClient({
             if (!response.ok) {
               console.error('tRPC fetch error:', response.status, response.statusText);
               
-              // Don't retry on client errors (4xx)
-              if (response.status >= 400 && response.status < 500) {
+              // Don't retry on client errors (4xx) except 401 (auth errors)
+              if (response.status >= 400 && response.status < 500 && response.status !== 401) {
                 throw new Error(`Client error: ${response.status} ${response.statusText}`);
+              }
+              
+              // Handle 401 auth errors by clearing token
+              if (response.status === 401) {
+                console.warn('Authentication failed, clearing stored token');
+                await AsyncStorage.removeItem('device_token');
+                throw new Error('Authentication failed - token cleared');
               }
               
               // Retry on server errors (5xx) or network issues
@@ -114,7 +128,11 @@ export const trpcClient = trpc.createClient({
               if (isNetworkError || isAbortError) {
                 console.error('All connection attempts failed. Backend server is not accessible.');
                 // Don't throw error, return a mock response to prevent app crash
-                return new Response(JSON.stringify({ error: 'Backend unavailable', offline: true }), {
+                return new Response(JSON.stringify({ 
+                  error: 'Backend unavailable', 
+                  offline: true,
+                  authenticated: !!deviceToken 
+                }), {
                   status: 503,
                   headers: { 'Content-Type': 'application/json' }
                 });

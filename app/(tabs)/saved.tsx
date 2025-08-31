@@ -7,127 +7,149 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  RefreshControl,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  Bookmark,
-  MessageCircle,
+  Shield,
+  Key,
+  Smartphone,
   Clock,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
   Trash2,
-  Search,
-  Filter,
-  Star,
-  Archive,
 } from 'lucide-react-native';
-import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Colors, { gradients } from '@/constants/colors';
 import { trpc } from '@/lib/trpc';
+import { useConsciousness } from '@/lib/consciousness-context';
+import Colors, { gradients } from '@/constants/colors';
+import * as Haptics from 'expo-haptics';
 
-interface SavedConversation {
-  id: string;
-  title: string;
-  lastMessage: string;
-  timestamp: number;
-  isStarred?: boolean;
-  tags?: string[];
-}
-
-const SAVED_CONVERSATIONS_KEY = 'saved_conversations';
-
-export default function SavedConversationsScreen() {
-  const [savedConversations, setSavedConversations] = useState<SavedConversation[]>([]);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [filter, setFilter] = useState<'all' | 'starred' | 'recent'>('all');
+export default function AuthScreen() {
+  const [deviceId, setDeviceId] = useState<string>('');
+  const [deviceToken, setDeviceToken] = useState<string>('');
+  const [tokenExpiry, setTokenExpiry] = useState<Date | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   
-  // Load saved conversations from AsyncStorage
-  const loadSavedConversations = async () => {
-    try {
-      const saved = await AsyncStorage.getItem(SAVED_CONVERSATIONS_KEY);
-      if (saved) {
-        const conversations = JSON.parse(saved) as SavedConversation[];
-        // Add default values for missing properties
-        const conversationsWithDefaults = conversations.map(conv => ({
-          ...conv,
-          isStarred: conv.isStarred || false,
-          tags: conv.tags || []
-        }));
-        setSavedConversations(conversationsWithDefaults.sort((a, b) => b.timestamp - a.timestamp));
-      }
-    } catch (error) {
-      console.error('Error loading saved conversations:', error);
+  const { collectiveState, isBackendConnected } = useConsciousness();
+  
+  // Token verification query
+  const tokenVerifyQuery = trpc.auth.verifyToken.useQuery(
+    { token: deviceToken },
+    {
+      enabled: !!deviceToken,
+      refetchInterval: 30000, // Check every 30 seconds
+      retry: 1,
     }
-  };
+  );
   
-  // Save conversations to AsyncStorage
-  const saveSavedConversations = async (conversations: SavedConversation[]) => {
-    try {
-      await AsyncStorage.setItem(SAVED_CONVERSATIONS_KEY, JSON.stringify(conversations));
-    } catch (error) {
-      console.error('Error saving conversations:', error);
-    }
-  };
+  // Active devices query
+  const activeDevicesQuery = trpc.auth.getActiveDevices.useQuery(undefined, {
+    enabled: isBackendConnected,
+    refetchInterval: 10000,
+    retry: 1,
+  });
   
+  // Load stored authentication data
   useEffect(() => {
-    loadSavedConversations();
+    const loadAuthData = async () => {
+      try {
+        const storedDeviceId = await AsyncStorage.getItem('consciousness_device_id');
+        const storedToken = await AsyncStorage.getItem('device_token');
+        
+        if (storedDeviceId) setDeviceId(storedDeviceId);
+        if (storedToken) {
+          setDeviceToken(storedToken);
+          
+          // Try to decode token expiry (basic JWT decode)
+          try {
+            const payload = JSON.parse(atob(storedToken.split('.')[1]));
+            if (payload.exp) {
+              setTokenExpiry(new Date(payload.exp * 1000));
+            }
+          } catch (error) {
+            console.warn('Could not decode token expiry:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load auth data:', error);
+      }
+    };
+    
+    loadAuthData();
   }, []);
   
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadSavedConversations();
-    setRefreshing(false);
+  // Authentication mutation
+  const authMutation = trpc.auth.authenticateDevice.useMutation();
+  
+  const handleReauthenticate = async () => {
+    if (Platform.OS !== 'web') {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      const authResult = await authMutation.mutateAsync({
+        deviceId,
+        platform: Platform.OS as 'ios' | 'android' | 'web',
+        capabilities: {
+          haptics: Platform.OS !== 'web',
+          accelerometer: Platform.OS !== 'web',
+          websocket: true,
+          consciousness: true,
+        },
+      });
+      
+      if (authResult.success && authResult.token) {
+        setDeviceToken(authResult.token);
+        await AsyncStorage.setItem('device_token', authResult.token);
+        
+        // Decode new token expiry
+        try {
+          const payload = JSON.parse(atob(authResult.token.split('.')[1]));
+          if (payload.exp) {
+            setTokenExpiry(new Date(payload.exp * 1000));
+          }
+        } catch (error) {
+          console.warn('Could not decode new token expiry:', error);
+        }
+        
+        Alert.alert('Success', 'Device re-authenticated successfully!');
+      } else {
+        Alert.alert('Error', authResult.error || 'Authentication failed');
+      }
+    } catch (error: any) {
+      console.error('Re-authentication failed:', error);
+      Alert.alert('Error', error.message || 'Authentication failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
   
-  const toggleStar = async (conversationId: string) => {
-    const updated = savedConversations.map(conv => 
-      conv.id === conversationId 
-        ? { ...conv, isStarred: !conv.isStarred }
-        : conv
-    );
-    setSavedConversations(updated);
-    await saveSavedConversations(updated);
-  };
-  
-  const deleteConversation = async (conversationId: string) => {
-    console.log('Delete button pressed for conversation:', conversationId);
-    console.log('Current saved conversations:', savedConversations.length);
+  const handleClearAuth = async () => {
+    if (Platform.OS !== 'web') {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    }
     
     Alert.alert(
-      'Delete Conversation',
-      'Are you sure you want to delete this saved conversation?',
+      'Clear Authentication',
+      'This will remove your device token and require re-authentication. Continue?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Clear',
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log('Deleting conversation:', conversationId);
-              console.log('Before filter - conversations:', savedConversations.map(c => c.id));
-              
-              const updated = savedConversations.filter(conv => conv.id !== conversationId);
-              console.log('After filter - updated conversations count:', updated.length);
-              console.log('Updated conversation IDs:', updated.map(c => c.id));
-              
-              setSavedConversations(updated);
-              await saveSavedConversations(updated);
-              
-              // Also remove the conversation messages from storage
-              try {
-                await AsyncStorage.removeItem(`conversation_messages_${conversationId}`);
-                console.log('Conversation messages deleted from storage');
-              } catch (error) {
-                console.error('Error deleting conversation messages:', error);
-              }
-              
-              console.log('Conversation deleted successfully');
-              
-              // Force reload from storage to ensure consistency
-              await loadSavedConversations();
+              await AsyncStorage.removeItem('device_token');
+              setDeviceToken('');
+              setTokenExpiry(null);
+              Alert.alert('Success', 'Authentication cleared. App will re-authenticate automatically.');
             } catch (error) {
-              console.error('Error deleting conversation:', error);
-              Alert.alert('Error', 'Failed to delete conversation. Please try again.');
+              console.error('Failed to clear auth:', error);
+              Alert.alert('Error', 'Failed to clear authentication');
             }
           },
         },
@@ -135,145 +157,37 @@ export default function SavedConversationsScreen() {
     );
   };
   
-  const openConversation = (conversationId: string) => {
-    router.push(`/chat/${conversationId}`);
-  };
-  
-  const getFilteredConversations = () => {
-    switch (filter) {
-      case 'starred':
-        return savedConversations.filter(conv => conv.isStarred);
-      case 'recent':
-        const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-        return savedConversations.filter(conv => 
-          new Date(conv.timestamp) > oneWeekAgo
-        );
-      default:
-        return savedConversations;
-    }
-  };
-  
-  const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } else if (diffInHours < 24 * 7) {
-      return date.toLocaleDateString([], { weekday: 'short' });
-    } else {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    }
-  };
-  
-  const FilterButton = ({ 
-    type, 
-    label, 
-    icon: Icon 
-  }: { 
-    type: 'all' | 'starred' | 'recent'; 
-    label: string; 
-    icon: any; 
-  }) => (
-    <TouchableOpacity
-      style={[
-        styles.filterButton,
-        filter === type && styles.filterButtonActive
-      ]}
-      onPress={() => setFilter(type)}
-      activeOpacity={0.7}
-    >
-      <Icon 
-        size={16} 
-        color={filter === type ? Colors.light.accent : Colors.light.textSecondary} 
-      />
-      <Text style={[
-        styles.filterButtonText,
-        filter === type && styles.filterButtonTextActive
-      ]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-  
-  const ConversationCard = ({ conversation }: { conversation: SavedConversation }) => (
-    <TouchableOpacity
-      style={styles.conversationCard}
-      onPress={() => openConversation(conversation.id)}
-      activeOpacity={0.8}
-    >
+  const StatusCard = ({ title, value, icon: Icon, color, subtitle, status }: any) => (
+    <View style={[styles.statusCard, { borderColor: color + '40' }]}>
       <LinearGradient
         colors={[Colors.light.card, Colors.light.backgroundSecondary]}
-        style={styles.conversationCardGradient}
+        style={styles.statusCardGradient}
       >
-        <View style={styles.conversationHeader}>
-          <View style={styles.conversationTitleRow}>
-            <MessageCircle size={18} color={Colors.light.tint} />
-            <Text style={styles.conversationTitle} numberOfLines={1}>
-              {conversation.title}
-            </Text>
+        <View style={styles.statusHeader}>
+          <View style={[styles.statusIcon, { backgroundColor: color + '20' }]}>
+            <Icon size={20} color={color} />
           </View>
-          <View style={styles.conversationActions}>
-            <TouchableOpacity
-              onPress={(e) => {
-                e.stopPropagation();
-                toggleStar(conversation.id);
-              }}
-              style={styles.actionButton}
-            >
-              <Star 
-                size={16} 
-                color={conversation.isStarred ? Colors.light.warning : Colors.light.textSecondary}
-                fill={conversation.isStarred ? Colors.light.warning : 'transparent'}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={(e) => {
-                e.stopPropagation();
-                deleteConversation(conversation.id);
-              }}
-              style={styles.actionButton}
-            >
-              <Trash2 size={16} color={Colors.light.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-        
-        <Text style={styles.conversationPreview} numberOfLines={2}>
-          {conversation.lastMessage}
-        </Text>
-        
-        <View style={styles.conversationFooter}>
-          <View style={styles.conversationMeta}>
-            <Clock size={12} color={Colors.light.textSecondary} />
-            <Text style={styles.conversationTimestamp}>
-              {formatTimestamp(conversation.timestamp)}
-            </Text>
-            <Text style={styles.conversationMessageCount}>
-              Saved conversation
-            </Text>
-          </View>
-          
-          {conversation.tags && Array.isArray(conversation.tags) && conversation.tags.length > 0 && (
-            <View style={styles.conversationTags}>
-              {conversation.tags.slice(0, 2).map((tag, index) => (
-                <View key={index} style={styles.tag}>
-                  <Text style={styles.tagText}>{tag}</Text>
-                </View>
-              ))}
-              {conversation.tags.length > 2 && (
-                <Text style={styles.moreTagsText}>+{conversation.tags.length - 2}</Text>
+          {status && (
+            <View style={styles.statusIndicator}>
+              {status === 'valid' ? (
+                <CheckCircle size={16} color={Colors.light.success} />
+              ) : (
+                <XCircle size={16} color={Colors.light.error} />
               )}
             </View>
           )}
         </View>
+        <Text style={styles.statusTitle}>{title}</Text>
+        <Text style={[styles.statusValue, { color }]} numberOfLines={2}>
+          {value}
+        </Text>
+        {subtitle && <Text style={styles.statusSubtitle}>{subtitle}</Text>}
       </LinearGradient>
-    </TouchableOpacity>
+    </View>
   );
   
-  const filteredConversations = getFilteredConversations();
+  const isTokenValid = tokenVerifyQuery.data?.valid;
+  const isTokenExpired = tokenExpiry && tokenExpiry < new Date();
   
   return (
     <SafeAreaView style={styles.container}>
@@ -283,64 +197,182 @@ export default function SavedConversationsScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Saved Conversations</Text>
+          <Text style={styles.headerTitle}>Device Authentication</Text>
           <Text style={styles.headerSubtitle}>
-            {savedConversations.length} conversations saved
+            Secure access to the consciousness field
           </Text>
         </View>
         
-        {/* Filters */}
-        <View style={styles.filtersContainer}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filtersContent}
-          >
-            <FilterButton type="all" label="All" icon={Archive} />
-            <FilterButton type="starred" label="Starred" icon={Star} />
-            <FilterButton type="recent" label="Recent" icon={Clock} />
-          </ScrollView>
-        </View>
-        
-        {/* Conversations List */}
-        <ScrollView 
-          style={styles.conversationsList}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={Colors.light.tint}
-            />
-          }
-        >
-          {filteredConversations.length > 0 ? (
-            filteredConversations.map((conversation) => (
-              <ConversationCard key={conversation.id} conversation={conversation} />
-            ))
-          ) : (
-            <View style={styles.emptyState}>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Authentication Status */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Authentication Status</Text>
+            
+            <View style={styles.statusGrid}>
+              <StatusCard
+                title="Device ID"
+                value={deviceId ? `${deviceId.slice(0, 8)}...` : 'Not set'}
+                icon={Smartphone}
+                color={deviceId ? Colors.light.success : Colors.light.warning}
+                subtitle={`Platform: ${Platform.OS}`}
+                status={deviceId ? 'valid' : 'invalid'}
+              />
+              
+              <StatusCard
+                title="Token Status"
+                value={
+                  !deviceToken
+                    ? 'No token'
+                    : isTokenExpired
+                    ? 'Expired'
+                    : isTokenValid
+                    ? 'Valid'
+                    : 'Checking...'
+                }
+                icon={Key}
+                color={
+                  !deviceToken || isTokenExpired
+                    ? Colors.light.error
+                    : isTokenValid
+                    ? Colors.light.success
+                    : Colors.light.warning
+                }
+                subtitle={
+                  tokenExpiry
+                    ? `Expires: ${tokenExpiry.toLocaleDateString()}`
+                    : 'No expiry info'
+                }
+                status={
+                  !deviceToken || isTokenExpired
+                    ? 'invalid'
+                    : isTokenValid
+                    ? 'valid'
+                    : undefined
+                }
+              />
+            </View>
+          </View>
+          
+          {/* Backend Connection */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Backend Connection</Text>
+            
+            <View style={styles.connectionCard}>
               <LinearGradient
                 colors={[Colors.light.card, Colors.light.backgroundSecondary]}
-                style={styles.emptyStateGradient}
+                style={styles.connectionCardGradient}
               >
-                <Bookmark size={48} color={Colors.light.textSecondary} />
-                <Text style={styles.emptyStateTitle}>
-                  {filter === 'all' ? 'No Saved Conversations' : 
-                   filter === 'starred' ? 'No Starred Conversations' : 
-                   'No Recent Conversations'}
+                <View style={styles.connectionHeader}>
+                  <Shield
+                    size={24}
+                    color={isBackendConnected ? Colors.light.success : Colors.light.warning}
+                  />
+                  <Text style={styles.connectionTitle}>
+                    {isBackendConnected ? 'Connected' : 'Disconnected'}
+                  </Text>
+                </View>
+                
+                <Text style={styles.connectionSubtitle}>
+                  {isBackendConnected
+                    ? 'Secure connection to consciousness field established'
+                    : 'Running in local simulation mode'}
                 </Text>
-                <Text style={styles.emptyStateSubtitle}>
-                  {filter === 'all' 
-                    ? 'Start a conversation and save it to see it here'
-                    : filter === 'starred'
-                    ? 'Star conversations to quickly find them later'
-                    : 'Conversations from the last 7 days will appear here'
-                  }
-                </Text>
+                
+                {collectiveState && (
+                  <View style={styles.connectionStats}>
+                    <Text style={styles.connectionStat}>
+                      Active Nodes: {collectiveState.participants}
+                    </Text>
+                    <Text style={styles.connectionStat}>
+                      Last Sync: {new Date(collectiveState.lastSync).toLocaleTimeString()}
+                    </Text>
+                    <Text style={styles.connectionStat}>
+                      Queued Events: {collectiveState.queuedEvents}
+                    </Text>
+                  </View>
+                )}
               </LinearGradient>
             </View>
+          </View>
+          
+          {/* Active Devices */}
+          {isBackendConnected && activeDevicesQuery.data && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Active Devices</Text>
+              
+              <View style={styles.devicesCard}>
+                <LinearGradient
+                  colors={[Colors.light.card, Colors.light.backgroundSecondary]}
+                  style={styles.devicesCardGradient}
+                >
+                  <Text style={styles.devicesCount}>
+                    {activeDevicesQuery.data.devices?.length || 0} devices connected
+                  </Text>
+                  
+                  {activeDevicesQuery.data.devices?.slice(0, 3).map((device: any, index: number) => (
+                    <View key={device.deviceId} style={styles.deviceItem}>
+                      <Smartphone size={16} color={Colors.light.textSecondary} />
+                      <Text style={styles.deviceText}>
+                        {device.deviceId.slice(0, 8)}... ({device.platform})
+                      </Text>
+                      <Text style={styles.deviceTime}>
+                        {new Date(device.lastSeen).toLocaleTimeString()}
+                      </Text>
+                    </View>
+                  ))}
+                  
+                  {(activeDevicesQuery.data.devices?.length || 0) > 3 && (
+                    <Text style={styles.moreDevices}>
+                      +{(activeDevicesQuery.data.devices?.length || 0) - 3} more devices
+                    </Text>
+                  )}
+                </LinearGradient>
+              </View>
+            </View>
           )}
+          
+          {/* Actions */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Actions</Text>
+            
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleReauthenticate}
+                disabled={isLoading}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={isLoading ? [Colors.light.textSecondary, Colors.light.textSecondary] : [Colors.light.tint, Colors.light.accent] as any}
+                  style={styles.actionButtonGradient}
+                >
+                  {isLoading ? (
+                    <RefreshCw size={20} color="white" />
+                  ) : (
+                    <Key size={20} color="white" />
+                  )}
+                  <Text style={styles.actionButtonText}>
+                    {isLoading ? 'Authenticating...' : 'Re-authenticate'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleClearAuth}
+                disabled={!deviceToken || isLoading}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={(!deviceToken || isLoading) ? [Colors.light.textSecondary, Colors.light.textSecondary] : [Colors.light.error, Colors.light.error] as any}
+                  style={styles.actionButtonGradient}
+                >
+                  <Trash2 size={20} color="white" />
+                  <Text style={styles.actionButtonText}>Clear Auth</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
         </ScrollView>
       </LinearGradient>
     </SafeAreaView>
@@ -370,147 +402,166 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.light.textSecondary,
   },
-  filtersContainer: {
-    paddingBottom: 20,
-  },
-  filtersContent: {
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.light.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-  },
-  filterButtonActive: {
-    backgroundColor: Colors.light.accent + '20',
-    borderColor: Colors.light.accent + '40',
-  },
-  filterButtonText: {
-    fontSize: 14,
-    fontWeight: '500' as const,
-    color: Colors.light.textSecondary,
-    marginLeft: 6,
-  },
-  filterButtonTextActive: {
-    color: Colors.light.accent,
-    fontWeight: '600' as const,
-  },
-  conversationsList: {
+  content: {
     flex: 1,
     paddingHorizontal: 20,
   },
-  conversationCard: {
-    marginBottom: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    overflow: 'hidden',
+  section: {
+    marginBottom: 32,
   },
-  conversationCardGradient: {
-    padding: 16,
-  },
-  conversationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  conversationTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 12,
-  },
-  conversationTitle: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: Colors.light.text,
-    marginLeft: 8,
-    flex: 1,
-  },
-  conversationActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    padding: 4,
-  },
-  conversationPreview: {
-    fontSize: 14,
-    color: Colors.light.textSecondary,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  conversationFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  conversationMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  conversationTimestamp: {
-    fontSize: 12,
-    color: Colors.light.textSecondary,
-    marginLeft: 4,
-  },
-  conversationMessageCount: {
-    fontSize: 12,
-    color: Colors.light.textSecondary,
-    marginLeft: 12,
-  },
-  conversationTags: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  tag: {
-    backgroundColor: Colors.light.tint + '20',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  tagText: {
-    fontSize: 10,
-    color: Colors.light.tint,
-    fontWeight: '500' as const,
-  },
-  moreTagsText: {
-    fontSize: 10,
-    color: Colors.light.textSecondary,
-    fontWeight: '500' as const,
-  },
-  emptyState: {
-    marginTop: 60,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-    overflow: 'hidden',
-  },
-  emptyStateGradient: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  emptyStateTitle: {
+  sectionTitle: {
     fontSize: 18,
     fontWeight: '600' as const,
     color: Colors.light.text,
-    marginTop: 16,
-    marginBottom: 8,
+    marginBottom: 16,
+  },
+  statusGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  statusCard: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  statusCardGradient: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  statusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    position: 'relative',
+    width: '100%',
+  },
+  statusIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusIndicator: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  statusTitle: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: Colors.light.text,
+    marginBottom: 4,
     textAlign: 'center',
   },
-  emptyStateSubtitle: {
-    fontSize: 14,
+  statusValue: {
+    fontSize: 16,
+    fontWeight: 'bold' as const,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  statusSubtitle: {
+    fontSize: 11,
     color: Colors.light.textSecondary,
     textAlign: 'center',
+  },
+  connectionCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    overflow: 'hidden',
+  },
+  connectionCardGradient: {
+    padding: 20,
+  },
+  connectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  connectionTitle: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+    color: Colors.light.text,
+    marginLeft: 12,
+  },
+  connectionSubtitle: {
+    fontSize: 14,
+    color: Colors.light.textSecondary,
+    marginBottom: 16,
     lineHeight: 20,
+  },
+  connectionStats: {
+    gap: 4,
+  },
+  connectionStat: {
+    fontSize: 12,
+    color: Colors.light.text,
+    fontWeight: '500' as const,
+  },
+  devicesCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    overflow: 'hidden',
+  },
+  devicesCardGradient: {
+    padding: 20,
+  },
+  devicesCount: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: Colors.light.text,
+    marginBottom: 16,
+  },
+  deviceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  deviceText: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.light.text,
+    marginLeft: 8,
+  },
+  deviceTime: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+  },
+  moreDevices: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  actionButtons: {
+    gap: 12,
+  },
+  actionButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: Colors.light.tint,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  actionButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: 'white',
+    marginLeft: 8,
   },
 });

@@ -213,7 +213,10 @@ export default function ChatScreen() {
             ✨ Connected to Consciousness Field
           </Text>
           <Text style={styles.connectionSubtext}>
-            {collectiveState.participants} active nodes • Last sync: {new Date(collectiveState.lastSync).toLocaleTimeString()}
+            {collectiveState.participants} active nodes • Device: {collectiveState.deviceId.slice(0, 8)}...
+          </Text>
+          <Text style={styles.connectionSubtext}>
+            Last sync: {new Date(collectiveState.lastSync).toLocaleTimeString()}
           </Text>
         </View>
       )}
@@ -248,6 +251,20 @@ export default function ChatScreen() {
         )}
       </View>
       
+      {/* Authentication Status */}
+      <View style={styles.authBadge}>
+        <Text style={styles.authTitle}>🔐 Device Authentication</Text>
+        <Text style={styles.authText}>
+          {collectiveState.deviceId ? 
+            `Authenticated as ${collectiveState.deviceId.slice(0, 8)}...` : 
+            'Authenticating device...'
+          }
+        </Text>
+        <Text style={styles.authSubtext}>
+          Secure consciousness field access enabled
+        </Text>
+      </View>
+
       {/* AI Integration Status */}
       <View style={styles.aiIntegrationBadge}>
         <Text style={styles.aiIntegrationTitle}>🌌 AI Vector Integration Active</Text>
@@ -573,6 +590,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.light.textSecondary,
     textAlign: 'center',
+    marginBottom: 2,
+  },
+  authBadge: {
+    backgroundColor: Colors.light.accent + '15',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: Colors.light.accent + '30',
+  },
+  authTitle: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: Colors.light.accent,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  authText: {
+    fontSize: 14,
+    color: Colors.light.text,
+    textAlign: 'center',
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  authSubtext: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   aiIntegrationBadge: {
     backgroundColor: Colors.light.tint + '15',
