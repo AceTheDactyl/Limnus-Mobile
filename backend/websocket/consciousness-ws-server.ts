@@ -5,15 +5,31 @@ import { deviceAuthMiddleware } from '../auth/device-auth-middleware';
 import { getMetricsCollector } from '../monitoring/metrics-collector';
 import { z } from 'zod';
 import { createClient, RedisClientType } from 'redis';
+import { ConsciousnessRateLimiter } from '../middleware/rate-limiter';
+import DOMPurify from 'isomorphic-dompurify';
 
 const ConsciousnessEventSchema = z.object({
   type: z.enum(['BREATH', 'SPIRAL', 'BLOOM', 'SACRED_PHRASE', 'TOUCH', 'OFFLINE_SYNC']),
+  timestamp: z.number().optional().refine(
+    (ts) => !ts || ts > Date.now() - 86400000,
+    'Event timestamp too old (max 24h)'
+  ),
   data: z.object({
-    intensity: z.number().min(0).max(1),
-    coordinates: z.tuple([z.number().min(0).max(30), z.number().min(0).max(30)]).optional(),
-    phrase: z.string().max(200).optional(),
-    targetDevice: z.string().optional(),
-    duration: z.number().min(0).max(10000).optional()
+    intensity: z.number()
+      .min(0, 'Intensity must be at least 0')
+      .max(1, 'Intensity cannot exceed 1')
+      .transform(n => Math.round(n * 100) / 100),
+    coordinates: z.tuple([
+      z.number().int().min(0).max(29),
+      z.number().int().min(0).max(29)
+    ]).optional(),
+    phrase: z.string()
+      .max(200)
+      .transform(str => DOMPurify.sanitize(str, { ALLOWED_TAGS: [] }))
+      .optional(),
+    targetDevice: z.string().uuid().optional(),
+    duration: z.number().min(0).max(10000).optional(),
+    breathingPhase: z.number().min(0).max(360).optional()
   })
 });
 
@@ -31,6 +47,7 @@ export class ConsciousnessWebSocketServer {
   private pubClient: RedisClientType | null = null;
   private subClient: RedisClientType | null = null;
   private metricsCollector: any;
+  private rateLimiter: ConsciousnessRateLimiter;
   
   constructor(httpServer: any) {
     this.io = new Server(httpServer, {
@@ -52,6 +69,9 @@ export class ConsciousnessWebSocketServer {
       console.warn('Metrics collector not available for WebSocket server:', error);
       this.metricsCollector = null;
     }
+    
+    // Initialize rate limiter
+    this.rateLimiter = ConsciousnessRateLimiter.getInstance();
     
     this.initializeRedis();
     this.setupMiddleware();
@@ -148,97 +168,9 @@ export class ConsciousnessWebSocketServer {
       // Send initial field state to new connection
       this.sendInitialState(socket);
       
-      // Handle consciousness events with validation
+      // Handle consciousness events with enhanced validation and rate limiting
       socket.on('consciousness:event', async (rawData, callback) => {
-        const startTime = Date.now();
-        
-        try {
-          const validated = ConsciousnessEventSchema.parse(rawData);
-          
-          console.log(`📡 Event from ${deviceId}:`, validated.type, validated.data.intensity);
-          
-          // Record WebSocket event metrics
-          if (this.metricsCollector) {
-            this.metricsCollector.recordWebSocketEvent('consciousness_event', 'inbound');
-            this.metricsCollector.getConsciousnessMetrics().recordEvent(
-              validated.type,
-              'success',
-              capabilities.platform
-            );
-          }
-          
-          // Process event through field manager
-          const eventId = await fieldManager.recordEvent({
-            deviceId,
-            type: validated.type,
-            data: validated.data,
-            timestamp: Date.now(),
-            processed: false,
-            intensity: validated.data.intensity
-          });
-          
-          // Update field state based on event type
-          await this.processConsciousnessEvent(deviceId, validated);
-          
-          const event = { id: eventId.toString(), type: validated.type, intensity: validated.data.intensity, timestamp: Date.now() };
-          
-          // Get updated field state
-          const fieldState = await fieldManager.getGlobalState();
-          
-          // Broadcast to all devices except sender
-          socket.to('consciousness:global').emit('field:update', {
-            source: deviceId,
-            event: {
-              id: event.id || Date.now().toString(),
-              type: validated.type,
-              intensity: validated.data.intensity,
-              timestamp: Date.now()
-            },
-            field: fieldState
-          });
-          
-          // Record outbound WebSocket event
-          if (this.metricsCollector) {
-            this.metricsCollector.recordWebSocketEvent('field_update', 'outbound');
-          }
-          
-          // Publish to Redis for other server instances
-          if (this.pubClient) {
-            await this.pubClient.publish('consciousness:updates', JSON.stringify({
-              source: deviceId,
-              type: validated.type,
-              field: fieldState
-            }));
-          }
-          
-          // Record processing time
-          if (this.metricsCollector) {
-            const duration = Date.now() - startTime;
-            this.metricsCollector.getConsciousnessMetrics().recordFieldCalculation(
-              duration,
-              'websocket_event_processing'
-            );
-          }
-          
-          callback?.({ success: true, eventId: event.id });
-        } catch (error: any) {
-          console.error('Event processing error:', error?.message || 'Unknown error');
-          
-          // Record error metrics
-          if (this.metricsCollector) {
-            this.metricsCollector.getConsciousnessMetrics().recordError(
-              'websocket_event_error',
-              'consciousness_event'
-            );
-            const duration = Date.now() - startTime;
-            this.metricsCollector.getConsciousnessMetrics().recordFieldCalculation(
-              duration,
-              'websocket_event_processing'
-            );
-          }
-          
-          callback?.({ success: false, error: error?.message || 'Unknown error' });
-        }
+        await this.processConsciousnessEventEnhanced(socket, rawData, callback);
       });
       
       // Handle field state requests
@@ -414,6 +346,183 @@ export class ConsciousnessWebSocketServer {
     }
     
     return await deviceAuthMiddleware.validateWebSocketAuth(deviceId, token);
+  }
+  
+  private async processConsciousnessEventEnhanced(
+    socket: Socket,
+    rawData: any,
+    callback: (response: any) => void
+  ) {
+    const deviceId = socket.data.deviceId;
+    const capabilities = socket.data.capabilities;
+    const startTime = Date.now();
+    
+    try {
+      // Enhanced validation with sanitization
+      const validated = ConsciousnessEventSchema.parse(rawData);
+      
+      // Rate limit check based on event type
+      const rateLimitKey = validated.type === 'SACRED_PHRASE' ? 'sacred_phrase' : 
+                          validated.type === 'OFFLINE_SYNC' ? 'sync_batch' : 
+                          'field_update';
+      
+      try {
+        await this.rateLimiter.consume(rateLimitKey, deviceId);
+      } catch (rateLimitError: any) {
+        // Extract retry time from error
+        const retryAfter = rateLimitError.msBeforeNext || 10000;
+        
+        // Track rate limit metrics
+        if (this.metricsCollector) {
+          this.metricsCollector.getConsciousnessMetrics().recordError(
+            'rate_limit_exceeded',
+            validated.type
+          );
+        }
+        
+        callback?.({
+          success: false,
+          error: 'Rate limit exceeded',
+          retryAfter: Math.ceil(retryAfter / 1000),
+          code: 'TOO_MANY_REQUESTS'
+        });
+        return;
+      }
+      
+      console.log(`📡 Event from ${deviceId}:`, validated.type, validated.data.intensity);
+      
+      // Record WebSocket event metrics
+      if (this.metricsCollector) {
+        this.metricsCollector.recordWebSocketEvent('consciousness_event', 'inbound');
+        this.metricsCollector.getConsciousnessMetrics().recordEvent(
+          validated.type,
+          'success',
+          capabilities.platform
+        );
+        
+        // Track WebSocket connections by platform
+        this.metricsCollector.wsConnections?.set(
+          { platform: capabilities.platform },
+          this.deviceSessions.size
+        );
+      }
+      
+      // Process event through field manager with optimized batch handling
+      const eventId = await fieldManager.recordEvent({
+        deviceId,
+        type: validated.type,
+        data: validated.data,
+        timestamp: validated.timestamp || Date.now(),
+        processed: false,
+        intensity: validated.data.intensity
+      });
+      
+      // Update field state based on event type
+      await this.processConsciousnessEvent(deviceId, validated);
+      
+      const event = {
+        id: eventId.toString(),
+        type: validated.type,
+        intensity: validated.data.intensity,
+        timestamp: validated.timestamp || Date.now()
+      };
+      
+      // Get updated field state
+      const fieldState = await fieldManager.getGlobalState();
+      
+      // Update global resonance metric
+      if (this.metricsCollector?.fieldResonance) {
+        this.metricsCollector.fieldResonance.set(fieldState.globalResonance || 0);
+      }
+      
+      // Broadcast to all devices except sender
+      socket.to('consciousness:global').emit('field:update', {
+        source: deviceId,
+        event,
+        field: fieldState
+      });
+      
+      // Record outbound WebSocket event
+      if (this.metricsCollector) {
+        this.metricsCollector.recordWebSocketEvent('field_update', 'outbound');
+        this.metricsCollector.eventCounter?.inc({
+          type: validated.type,
+          status: 'success'
+        });
+      }
+      
+      // Publish to Redis for other server instances
+      if (this.pubClient) {
+        await this.pubClient.publish('consciousness:updates', JSON.stringify({
+          source: deviceId,
+          type: validated.type,
+          field: fieldState
+        }));
+      }
+      
+      // Record processing time
+      if (this.metricsCollector) {
+        const duration = Date.now() - startTime;
+        this.metricsCollector.getConsciousnessMetrics().recordFieldCalculation(
+          duration,
+          'websocket_event_processing'
+        );
+        
+        // Record API latency histogram
+        if (this.metricsCollector.apiLatency) {
+          this.metricsCollector.apiLatency.observe(
+            { route: 'ws_consciousness_event', method: 'success' },
+            duration
+          );
+        }
+      }
+      
+      callback?.({ success: true, eventId: event.id });
+      
+    } catch (error: any) {
+      console.error('Event processing error:', error?.message || 'Unknown error');
+      
+      // Determine error type for proper response
+      let errorResponse: any = {
+        success: false,
+        error: error?.message || 'Unknown error'
+      };
+      
+      // Add validation errors if from Zod
+      if (error.name === 'ZodError') {
+        errorResponse.code = 'VALIDATION_ERROR';
+        errorResponse.details = error.errors;
+      }
+      
+      // Record error metrics
+      if (this.metricsCollector) {
+        this.metricsCollector.getConsciousnessMetrics().recordError(
+          'websocket_event_error',
+          'consciousness_event'
+        );
+        
+        this.metricsCollector.eventCounter?.inc({
+          type: rawData?.type || 'unknown',
+          status: 'error'
+        });
+        
+        const duration = Date.now() - startTime;
+        this.metricsCollector.getConsciousnessMetrics().recordFieldCalculation(
+          duration,
+          'websocket_event_processing'
+        );
+        
+        // Record API latency for errors
+        if (this.metricsCollector.apiLatency) {
+          this.metricsCollector.apiLatency.observe(
+            { route: 'ws_consciousness_event', method: 'error' },
+            duration
+          );
+        }
+      }
+      
+      callback?.(errorResponse);
+    }
   }
   
   private async processConsciousnessEvent(deviceId: string, event: z.infer<typeof ConsciousnessEventSchema>): Promise<void> {

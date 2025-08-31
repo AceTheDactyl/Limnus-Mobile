@@ -2,7 +2,7 @@ import { RateLimiterMemory, RateLimiterRedis } from 'rate-limiter-flexible';
 import { TRPCError } from '@trpc/server';
 import { redis } from '../infrastructure/database';
 
-class ConsciousnessRateLimiter {
+export class ConsciousnessRateLimiter {
   private limiters: Map<string, RateLimiterMemory | RateLimiterRedis>;
   private static instance: ConsciousnessRateLimiter;
   
