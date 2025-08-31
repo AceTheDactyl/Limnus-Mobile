@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { fieldManager } from '../infrastructure/field-manager';
-import { deviceAuthMiddleware } from '../auth/device-auth-middleware';
+import { deviceAuthMiddleware, DeviceAuthMiddleware } from '../auth/device-auth-middleware';
 import { getMetricsCollector } from '../monitoring/metrics-collector';
 import { z } from 'zod';
 import { createClient, RedisClientType } from 'redis';
@@ -116,8 +116,9 @@ export class ConsciousnessWebSocketServer {
         // Validate capabilities
         const validatedCapabilities = DeviceCapabilitiesSchema.parse(capabilities || {});
         
-        // Validate device authentication
-        const isValid = await this.validateDevice(deviceId, token);
+        // Validate device authentication using the new middleware
+        const authMiddleware = new DeviceAuthMiddleware();
+        const isValid = await authMiddleware.validateWebSocketAuth(deviceId, token);
         if (!isValid) {
           throw new Error(`Device authentication failed for ${deviceId}`);
         }
