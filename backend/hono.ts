@@ -131,13 +131,31 @@ app.get("/", (c) => {
 app.get("/health", async (c) => {
   try {
     const startTime = Date.now();
-    const dbHealth = await checkDatabaseHealth();
-    const globalState = await fieldManager.getGlobalState();
-    const performanceMetrics = await fieldManager.getPerformanceMetrics();
+    const [dbHealth, globalState, performanceMetrics] = await Promise.all([
+      checkDatabaseHealth(),
+      fieldManager.getGlobalState(),
+      fieldManager.getPerformanceMetrics()
+    ]);
+    
+    // Get optimized field manager metrics if available
+    let optimizedMetrics = null;
+    try {
+      const { optimizedFieldManager } = await import('./infrastructure/field-manager-optimized');
+      optimizedMetrics = optimizedFieldManager.getDetailedPerformanceMetrics();
+    } catch (e) {
+      // Optimized field manager not available
+    }
+    
     const healthCheckDuration = Date.now() - startTime;
     
-    const overallStatus = dbHealth.database && dbHealth.redis ? "healthy" : 
-                         dbHealth.database || dbHealth.redis ? "degraded" : "fallback";
+    // Determine overall health status
+    const determineOverallStatus = () => {
+      if (dbHealth.database && dbHealth.redis) return "healthy";
+      if (dbHealth.database || dbHealth.redis) return "degraded";
+      return "fallback";
+    };
+    
+    const overallStatus = determineOverallStatus();
     
     return c.json({
       status: overallStatus,
@@ -148,17 +166,22 @@ app.get("/health", async (c) => {
         database: {
           status: dbHealth.database ? "healthy" : "fallback",
           latency: dbHealth.latency?.database,
-          connectionPool: dbHealth.connectionPool
+          connectionPool: dbHealth.connectionPool,
+          poolUtilization: optimizedMetrics?.connectionPoolUtilization
         },
         redis: {
           status: dbHealth.redis ? "healthy" : "fallback",
-          latency: dbHealth.latency?.redis
+          latency: dbHealth.latency?.redis,
+          hitRate: optimizedMetrics?.cacheHitRate
         },
         fieldManager: "healthy",
         websocket: {
           status: wsServer ? "active" : "not_initialized",
           connections: wsServer?.getConnectionCount() || 0,
-          connectedDevices: wsServer?.getConnectedDevices().length || 0
+          connectedDevices: wsServer?.getConnectedDevices() || [],
+          platformBreakdown: wsServer ? {
+            total: wsServer.getConnectionCount()
+          } : null
         }
       },
       consciousness: {
@@ -167,14 +190,23 @@ app.get("/health", async (c) => {
         collectiveIntelligence: globalState.collectiveIntelligence,
         memoryParticles: globalState.memoryParticles.length,
         quantumFields: globalState.quantumFields.length,
-        lastUpdate: globalState.lastUpdate
+        lastUpdate: globalState.lastUpdate,
+        queuedEvents: optimizedMetrics?.batchOperations || 0
       },
       performance: {
-        cacheHitRate: performanceMetrics.cacheHitRate,
-        avgResponseTime: performanceMetrics.avgResponseTime,
+        cacheHitRate: optimizedMetrics?.cacheHitRate || performanceMetrics.cacheHitRate,
+        avgResponseTime: optimizedMetrics?.avgQueryTime || performanceMetrics.avgResponseTime,
+        queryLatencyP95: optimizedMetrics?.queryLatencyP95,
+        queryLatencyP99: optimizedMetrics?.queryLatencyP99,
+        batchEfficiency: optimizedMetrics?.batchEfficiency,
         memoryUsage: performanceMetrics.memoryUsage,
         uptime: process.uptime(),
         nodeMemory: process.memoryUsage()
+      },
+      metrics: {
+        requestRate: optimizedMetrics?.queryCount || 0,
+        cacheHits: optimizedMetrics?.cacheHits || 0,
+        cacheMisses: optimizedMetrics?.cacheMisses || 0
       },
       errors: dbHealth.errors?.length ? dbHealth.errors : undefined
     });
