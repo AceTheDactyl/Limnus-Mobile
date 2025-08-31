@@ -3,6 +3,7 @@ import { initTRPC } from "@trpc/server";
 import superjson from "superjson";
 import { deviceAuthMiddleware } from '../auth/device-auth-middleware';
 import { getRateLimiter } from '../middleware/rate-limiter';
+import { metricsCollector } from '../monitoring/metrics-collector';
 
 // Context creation function
 export const createContext = async (opts: FetchCreateContextFnOptions) => {
@@ -10,6 +11,7 @@ export const createContext = async (opts: FetchCreateContextFnOptions) => {
     req: opts.req,
     device: null as any, // Will be populated by auth middleware
     rateLimiter: getRateLimiter(), // Add rate limiter to context
+    metrics: metricsCollector, // Add metrics collector to context
   };
 };
 

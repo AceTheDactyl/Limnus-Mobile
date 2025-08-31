@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, gte } from 'drizzle-orm';
 import { db, deviceSessions } from '../infrastructure/database';
 import { TRPCError } from '@trpc/server';
 
@@ -28,12 +28,13 @@ export class DeviceAuthMiddleware {
         return true; // Allow connection in fallback mode
       }
       
-      // Check session exists and token matches
+      // Check session exists, token matches, and not expired
       const [session] = await db.select()
         .from(deviceSessions)
         .where(and(
           eq(deviceSessions.deviceId, deviceId),
-          eq(deviceSessions.token, token)
+          eq(deviceSessions.token, token),
+          gte(deviceSessions.expiresAt, new Date())
         ))
         .limit(1);
       
@@ -84,12 +85,13 @@ export class DeviceAuthMiddleware {
           return next();
         }
         
-        // Verify session exists in database and token matches
+        // Verify session exists in database, token matches, and not expired
         const [session] = await db.select()
           .from(deviceSessions)
           .where(and(
             eq(deviceSessions.deviceId, decoded.deviceId),
-            eq(deviceSessions.token, token)
+            eq(deviceSessions.token, token),
+            gte(deviceSessions.expiresAt, new Date())
           ))
           .limit(1);
         

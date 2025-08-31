@@ -1,42 +1,44 @@
 import { z } from "zod";
 import { protectedProcedure } from "@/backend/trpc/create-context";
 import { fieldManager } from "@/backend/infrastructure/field-manager";
+import { optimizedFieldManager } from "@/backend/infrastructure/field-manager-optimized";
 import { withBatchRateLimit } from "@/backend/middleware/rate-limiter";
+import { BatchSyncSchema, validateInput } from "@/backend/validation/consciousness-schemas";
+import { metricsCollector } from "@/backend/monitoring/metrics-collector";
 
-const syncEventSchema = z.object({
-  deviceId: z.string(),
-  events: z.array(z.object({
-    type: z.enum(['BREATH', 'SPIRAL', 'BLOOM', 'TOUCH', 'SACRED_PHRASE', 'OFFLINE_SYNC']),
-    data: z.any(),
-    timestamp: z.number(),
-    deviceId: z.string()
-  }))
-});
+// Use the validated schema from consciousness-schemas
+const syncEventSchema = BatchSyncSchema;
 
 export const syncProcedure = protectedProcedure
   .use(withBatchRateLimit('sync_batch', 1))
+  .use(validateInput(syncEventSchema))
+  .use(metricsCollector.wrapProcedure('consciousness.sync'))
   .input(syncEventSchema)
-  .mutation(async ({ input }: { input: z.infer<typeof syncEventSchema> }) => {
+  .mutation(async ({ input, ctx }: { input: z.infer<typeof syncEventSchema>; ctx: any }) => {
     const { deviceId, events } = input;
     
     console.log(`Syncing ${events.length} events from ${deviceId}`);
     
     try {
+      // Use optimized batch recording
+      const batchResults = await optimizedFieldManager.recordEventsBatch(
+        events.map(e => ({
+          deviceId: e.type === 'OFFLINE_SYNC' ? deviceId : deviceId,
+          type: e.type,
+          data: e.data,
+          timestamp: e.timestamp,
+          processed: false,
+          intensity: e.data?.intensity || 0.5
+        }))
+      );
       const processedEvents = [];
       
-      // Process each event with persistent storage
-      for (const event of events) {
+      // Process specific event types for additional effects
+      for (const [index, event] of events.entries()) {
         console.log(`Processing ${event.type} event:`, event.data);
         
-        // Record event in database
-        const eventId = await fieldManager.recordEvent({
-          deviceId: event.deviceId,
-          type: event.type,
-          data: event.data,
-          timestamp: event.timestamp,
-          processed: false,
-          intensity: event.data?.intensity || 0.5
-        });
+        // Event already recorded in batch, use the returned ID
+        const eventId = batchResults || index;
         
         // Process specific event types
         switch (event.type) {
@@ -100,11 +102,18 @@ export const syncProcedure = protectedProcedure
         });
       }
       
-      // Update active nodes count
-      await fieldManager.updateActiveNodes();
+      // Update active nodes count using optimized method
+      const activeNodes = await optimizedFieldManager.getActiveNodes();
       
       // Get updated global state
       const globalState = await fieldManager.getGlobalState();
+      
+      // Track metrics
+      ctx.metrics.updateFieldMetrics(
+        globalState.globalResonance,
+        activeNodes,
+        globalState.collectiveIntelligence
+      );
       
       return {
         success: true,

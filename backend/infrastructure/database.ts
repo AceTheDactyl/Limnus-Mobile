@@ -99,6 +99,7 @@ export const deviceSessions = pgTable('device_sessions', {
   platform: varchar('platform', { length: 20 }).notNull(),
   capabilities: jsonb('capabilities').$type<Record<string, boolean>>().default({}),
   lastSeen: timestamp('last_seen').defaultNow(),
+  expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

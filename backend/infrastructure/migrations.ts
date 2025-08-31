@@ -31,6 +31,7 @@ export class MigrationRunner {
       await this.runMigration('004_initialize_global_state', this.migration004InitializeGlobalState.bind(this));
       await this.runMigration('005_add_device_sessions', this.migration005AddDeviceSessions.bind(this));
       await this.runMigration('006_add_performance_indexes', this.migration006AddPerformanceIndexes.bind(this));
+      await this.runMigration('007_add_expires_at_to_sessions', this.migration007AddExpiresAtToSessions.bind(this));
       
       console.log('✅ All migrations completed successfully');
       return { success: true };
@@ -146,6 +147,7 @@ export class MigrationRunner {
         platform VARCHAR(20) NOT NULL,
         capabilities JSONB DEFAULT '{}'::jsonb,
         last_seen TIMESTAMP DEFAULT NOW(),
+        expires_at TIMESTAMP NOT NULL,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
@@ -155,6 +157,7 @@ export class MigrationRunner {
     await db!.execute(sql`CREATE INDEX IF NOT EXISTS idx_device_sessions_device_id ON device_sessions(device_id)`);
     await db!.execute(sql`CREATE INDEX IF NOT EXISTS idx_device_sessions_platform ON device_sessions(platform)`);
     await db!.execute(sql`CREATE INDEX IF NOT EXISTS idx_device_sessions_last_seen ON device_sessions(last_seen DESC)`);
+    await db!.execute(sql`CREATE INDEX IF NOT EXISTS idx_device_sessions_expires_at ON device_sessions(expires_at)`);
   }
   
   private async migration002AddIndexes(): Promise<void> {
@@ -214,6 +217,32 @@ export class MigrationRunner {
     `);
     
     console.log('✅ Performance indexes added successfully');
+  }
+  
+  private async migration007AddExpiresAtToSessions(): Promise<void> {
+    // Check if expires_at column exists
+    const columnExists = await db!.execute(sql`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'device_sessions' 
+      AND column_name = 'expires_at'
+    `);
+    
+    if (columnExists.length === 0) {
+      // Add expires_at column if it doesn't exist
+      await db!.execute(sql`
+        ALTER TABLE device_sessions 
+        ADD COLUMN expires_at TIMESTAMP NOT NULL DEFAULT NOW() + INTERVAL '7 days'
+      `);
+      
+      // Add index for expires_at
+      await db!.execute(sql`
+        CREATE INDEX IF NOT EXISTS idx_device_sessions_expires_at 
+        ON device_sessions(expires_at)
+      `);
+      
+      console.log('✅ Added expires_at column to device_sessions');
+    }
   }
   
   private async migration003AddConstraints(): Promise<void> {
