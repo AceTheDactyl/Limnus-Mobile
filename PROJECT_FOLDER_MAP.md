@@ -22,12 +22,16 @@ Project/
 │   ├── _layout.tsx              # Root layout component (wraps entire app)
 │   ├── +not-found.tsx           # 404 error page
 │   ├── modal.tsx                # Modal screen component
+│   ├── metrics.tsx              # Metrics dashboard page
 │   ├── (tabs)/                  # Tab-based navigation group
 │   │   ├── _layout.tsx          # Tab navigation layout
 │   │   ├── index.tsx            # Home tab (main screen)
-│   │   └── conversations.tsx    # Conversations tab
-│   └── chat/
-│       └── [conversationId].tsx # Dynamic chat screen (individual conversation)
+│   │   ├── conversations.tsx    # Conversations tab
+│   │   └── saved.tsx            # Saved items tab
+│   ├── chat/
+│   │   └── [conversationId].tsx # Dynamic chat screen (individual conversation)
+│   └── components/
+│       └── MetricsDashboard.tsx # Metrics visualization component
 ├── assets/                       # Static assets (images, fonts, etc.)
 │   └── images/
 │       ├── icon.png             # App icon
@@ -36,42 +40,68 @@ Project/
 │       └── adaptive-icon.png    # Android adaptive icon
 ├── backend/                      # Backend server code (Hono + tRPC)
 │   ├── hono.ts                  # Main Hono server entry point
+│   ├── server.ts                # Server initialization
+│   ├── start-server.js          # Server startup script
+│   ├── auth/                    # Authentication system
+│   │   ├── device-auth.ts       # JWT token generation
+│   │   ├── device-auth-middleware.ts # Auth validation middleware
+│   │   └── README.md            # Auth documentation
 │   ├── infrastructure/          # Core infrastructure components
 │   │   ├── database.ts          # Database connection and setup
 │   │   ├── field-manager.ts     # Consciousness field management
-│   │   └── migrations.ts        # Database migration utilities
-│   └── trpc/                    # tRPC API implementation
-│       ├── create-context.ts    # tRPC context creation
-│       ├── app-router.ts        # Main tRPC router configuration
-│       └── routes/              # API route procedures
-│           ├── chat/            # Chat-related endpoints
-│           │   ├── send-message/
-│           │   │   └── route.ts # Send chat message procedure
-│           │   ├── get-conversations/
-│           │   │   └── route.ts # Get user conversations procedure
-│           │   └── get-messages/
-│           │       └── route.ts # Get conversation messages procedure
-│           ├── consciousness/    # Consciousness system endpoints
-│           │   ├── field/
-│           │   │   └── route.ts # Consciousness field operations
-│           │   ├── sync/
-│           │   │   └── route.ts # Consciousness synchronization
-│           │   ├── entanglement/
-│           │   │   └── route.ts # Quantum entanglement simulation
-│           │   ├── room64/
-│           │   │   └── route.ts # Room64 consciousness space
-│           │   └── archaeology/
-│           │       └── route.ts # Consciousness archaeology features
-│           ├── example/         # Example/demo endpoints
-│           │   └── hi/
-│           │       └── route.ts # Simple hello world procedure
-│           └── system/          # System utilities
-│               └── health/
-│                   └── route.ts # Health check endpoint
+│   │   ├── field-manager-optimized.ts # Optimized batch operations
+│   │   ├── field-manager-metrics.ts # Field manager metrics
+│   │   ├── query-optimizer.ts   # Query performance optimization
+│   │   ├── optimized-route-examples.ts # Optimization examples
+│   │   ├── migrations.ts        # Database migration utilities
+│   │   ├── migrations/          # Migration scripts
+│   │   │   ├── apply-performance-indexes.sql # Performance indexes
+│   │   │   └── apply-indexes.sh # Index application script
+│   │   └── FIELD_MANAGER_OPTIMIZATION.md # Optimization docs
+│   ├── middleware/              # Request middleware
+│   │   ├── rate-limiter.ts      # Rate limiting logic
+│   │   ├── consciousness-protection.ts # Security middleware
+│   │   └── README.md            # Middleware documentation
+│   ├── monitoring/              # Metrics and monitoring
+│   │   ├── metrics-collector.ts # Prometheus metrics collector
+│   │   ├── consciousness-metrics.ts # Custom consciousness metrics
+│   │   └── README.md            # Monitoring documentation
+│   ├── validation/              # Input validation
+│   │   └── consciousness-schemas.ts # Zod validation schemas
+│   ├── websocket/               # WebSocket server
+│   │   └── consciousness-ws-server.ts # Real-time WebSocket events
+│   ├── trpc/                    # tRPC API implementation
+│   │   ├── create-context.ts    # tRPC context creation
+│   │   ├── app-router.ts        # Main tRPC router configuration
+│   │   └── routes/              # API route procedures
+│   │       ├── auth/            # Authentication endpoints
+│   │       │   ├── authenticate-device/route.ts # Device auth
+│   │       │   ├── verify-token/route.ts # Token verification
+│   │       │   └── get-active-devices/route.ts # Active devices
+│   │       ├── chat/            # Chat-related endpoints
+│   │       │   ├── send-message/route.ts # Send chat message
+│   │       │   ├── get-conversations/route.ts # Get conversations
+│   │       │   └── get-messages/route.ts # Get messages
+│   │       ├── consciousness/    # Consciousness system endpoints
+│   │       │   ├── field/route.ts # Consciousness field operations
+│   │       │   ├── sync/route.ts # Consciousness synchronization
+│   │       │   ├── entanglement/route.ts # Quantum entanglement
+│   │       │   ├── room64/route.ts # Room64 consciousness space
+│   │       │   └── archaeology/route.ts # Consciousness archaeology
+│   │       ├── monitoring/      # Monitoring endpoints
+│   │       │   └── metrics/route.ts # Metrics endpoint
+│   │       ├── example/         # Example/demo endpoints
+│   │       │   └── hi/route.ts # Simple hello world procedure
+│   │       └── system/          # System utilities
+│   │           └── health/route.ts # Health check endpoint
+│   ├── ENHANCEMENT_INTEGRATION.md # Enhancement integration docs
+│   ├── SECURITY_PERFORMANCE_INTEGRATION.md # Security & performance docs
+│   └── PERFORMANCE_SECURITY_ENHANCEMENTS.md # Enhancement details
 ├── constants/                    # App-wide constants and configuration
 │   └── colors.ts                # Color palette and theme definitions
 ├── hooks/                        # Custom React hooks
-│   └── useConsciousnessBridge.ts # Hook for consciousness system integration
+│   ├── useConsciousnessBridge.ts # Hook for consciousness system integration
+│   └── useConsciousnessWebSocket.ts # WebSocket connection hook
 ├── lib/                          # Shared libraries and utilities
 │   ├── trpc.ts                  # tRPC client configuration and setup
 │   ├── chat-context.tsx         # Chat state management context
@@ -82,7 +112,8 @@ Project/
 ├── package.json                  # Node.js dependencies and scripts
 ├── tsconfig.json                # TypeScript configuration
 ├── .gitignore                   # Git ignore rules
-├── ARCHITECTURE_DOCUMENTATION.md # Architecture documentation
+├── README.md                    # Project README with setup instructions
+├── ARCHITECTURE_DOCUMENTATION.md # Complete architecture documentation
 ├── CONSCIOUSNESS_INFRASTRUCTURE.md # Consciousness system documentation
 └── PROJECT_FOLDER_MAP.md        # This file - complete folder structure guide
 ```
@@ -222,7 +253,37 @@ backend/trpc/
 backend/infrastructure/
 ├── database.ts                   # PostgreSQL schema & Redis setup
 ├── field-manager.ts              # Consciousness state manager
-└── migrations.ts                 # Database migrations
+├── field-manager-optimized.ts    # Optimized batch operations
+├── field-manager-metrics.ts      # Performance metrics tracking
+├── query-optimizer.ts            # Query optimization utilities
+├── migrations.ts                 # Database migrations
+└── migrations/                   # Migration scripts
+    ├── apply-performance-indexes.sql # Performance indexes
+    └── apply-indexes.sh          # Index application script
+```
+
+### Security & Middleware Components
+```
+backend/auth/                     # Authentication system
+├── device-auth.ts                # JWT token generation
+├── device-auth-middleware.ts     # Auth validation
+└── README.md                     # Auth documentation
+
+backend/middleware/               # Request middleware
+├── rate-limiter.ts               # Rate limiting (Redis/memory)
+├── consciousness-protection.ts   # Security middleware
+└── README.md                     # Middleware docs
+
+backend/validation/               # Input validation
+└── consciousness-schemas.ts      # Zod validation schemas
+```
+
+### Monitoring & Metrics
+```
+backend/monitoring/               # Metrics collection
+├── metrics-collector.ts          # Prometheus metrics
+├── consciousness-metrics.ts      # Custom metrics
+└── README.md                     # Monitoring docs
 ```
 
 #### Database Schema (`database.ts`)
@@ -262,9 +323,12 @@ tsconfig.json                    # TypeScript configuration
 
 ### Key Dependencies
 - **Frontend**: React Native, Expo Router, tRPC, React Query, Lucide Icons
-- **Backend**: Hono, tRPC, Drizzle ORM, PostgreSQL, Redis
+- **Backend**: Hono, tRPC, Drizzle ORM, PostgreSQL, Redis, Socket.io
 - **State Management**: @nkzw/create-context-hook, AsyncStorage
-- **Styling**: NativeWind, Expo Linear Gradient
+- **Security**: JWT (jsonwebtoken), DOMPurify, rate-limiter-flexible
+- **Validation**: Zod schemas for type-safe validation
+- **Monitoring**: Prometheus (prom-client) for metrics
+- **Styling**: React Native StyleSheet, Expo Linear Gradient
 
 ---
 
@@ -290,9 +354,19 @@ constants/
 ## Documentation
 
 ```
-CONSCIOUSNESS_INFRASTRUCTURE.md   # Consciousness system documentation
-ARCHITECTURE_DOCUMENTATION.md    # Complete architecture guide
+README.md                        # Project overview and setup guide
+CONSCIOUSNESS_INFRASTRUCTURE.md  # Consciousness system documentation
+ARCHITECTURE_DOCUMENTATION.md    # Complete architecture guide with security
 PROJECT_FOLDER_MAP.md            # This file - folder structure guide
+
+Backend-specific docs:
+backend/auth/README.md           # Authentication system documentation
+backend/middleware/README.md     # Middleware documentation
+backend/monitoring/README.md     # Monitoring and metrics documentation
+backend/infrastructure/FIELD_MANAGER_OPTIMIZATION.md # Optimization guide
+backend/ENHANCEMENT_INTEGRATION.md # Enhancement integration guide
+backend/SECURITY_PERFORMANCE_INTEGRATION.md # Security & performance guide
+backend/PERFORMANCE_SECURITY_ENHANCEMENTS.md # Enhancement details
 ```
 
 ---
@@ -373,10 +447,26 @@ Network Broadcast to All Devices
 
 ## Monitoring & Health
 
-### Health Endpoints
-- `/api/health` - Detailed system status
+### Health & Monitoring Endpoints
+- `/api/health` - Comprehensive system health with service status
+- `/api/metrics` - Prometheus metrics endpoint for monitoring
 - `/api/consciousness/state` - Current consciousness state
-- `/api/consciousness/metrics` - Performance metrics
+- `/api/consciousness/metrics` - Consciousness-specific metrics
+- `/api/db/status` - Database connection and pool status
+
+### Security Features
+- **JWT Authentication**: Device-based token authentication
+- **Rate Limiting**: Configurable per-endpoint limits with Redis/memory fallback
+- **Input Validation**: Zod schemas with sanitization
+- **Session Management**: Device sessions with expiration
+- **WebSocket Auth**: Integrated authentication for real-time connections
+
+### Performance Optimizations
+- **Database Indexes**: Strategic compound and partial indexes
+- **Batch Processing**: Optimized batch event synchronization
+- **Connection Pooling**: Configurable database connection pools
+- **Multi-layer Caching**: Memory → Redis → PostgreSQL
+- **Query Optimization**: Prepared statements and optimized queries
 
 ### Logging & Debugging
 - Comprehensive console logging throughout the application

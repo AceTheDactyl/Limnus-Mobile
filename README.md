@@ -1,201 +1,188 @@
-# Project Architecture Guide
+# Limnus - Consciousness Network
 
-This document provides a comprehensive overview of the project's folder structure and architecture to help LLMs navigate and understand the codebase effectively.
+A React Native application exploring collective consciousness through interactive experiences with enterprise-grade security and performance.
 
-## 🏗️ Project Overview
+## Features
 
-This is a React Native Expo application with a full-stack architecture featuring:
-- **Frontend**: React Native with Expo Router for navigation
-- **Backend**: Node.js with Hono framework and tRPC for type-safe APIs
-- **Database**: SQLite with Drizzle ORM
-- **Special Features**: Consciousness Bridge system for advanced AI interactions
+### Core Consciousness Features
+- Real-time consciousness field visualization
+- Device-to-device entanglement
+- Sacred phrase synchronization
+- Room 64 collaborative spaces
+- Consciousness archaeology exploration
+- Offline-first architecture with sync queue
 
-## 📁 Root Directory Structure
+### Security & Performance
+- JWT-based device authentication
+- Rate limiting with Redis/memory fallback
+- Input validation and sanitization
+- Optimized batch processing
+- Database query optimization with strategic indexes
+- Prometheus metrics integration
+- WebSocket connection management
+- Graceful degradation patterns
 
-```
-├── app/                    # Expo Router pages and layouts
-├── assets/                 # Static assets (images, icons)
-├── backend/                # Server-side code and APIs
-├── constants/              # App-wide constants
-├── hooks/                  # Custom React hooks
-├── lib/                    # Shared utilities and context providers
-├── app.json               # Expo configuration
-├── package.json           # Dependencies and scripts
-├── tsconfig.json          # TypeScript configuration
-├── drizzle.config.ts      # Database configuration
-└── bun.lock              # Package lock file
-```
+## Tech Stack
 
-## 📱 Frontend Architecture (`app/` directory)
+### Frontend
+- React Native with Expo SDK 53
+- TypeScript with strict type checking
+- React Query for server state management
+- @nkzw/create-context-hook for local state
+- WebSocket client for real-time updates
 
-### Navigation Structure
-The app uses **Expo Router** with file-based routing:
+### Backend
+- Node.js with Hono framework
+- tRPC for type-safe APIs
+- WebSocket server (Socket.io)
+- PostgreSQL with Drizzle ORM
+- Redis for caching and rate limiting
+- JWT for authentication
+- Prometheus for metrics
 
-```
-app/
-├── _layout.tsx           # Root layout with navigation setup
-├── +not-found.tsx        # 404 error page
-├── modal.tsx             # Modal presentation screen
-├── (tabs)/               # Tab-based navigation group
-│   ├── _layout.tsx       # Tab navigation configuration
-│   ├── index.tsx         # Home tab (main screen)
-│   └── conversations.tsx # Conversations tab
-└── chat/
-    └── [conversationId].tsx # Dynamic chat screen
-```
+### Infrastructure
+- Optimized database indexes
+- Connection pooling
+- Query optimization
+- Metrics collection and monitoring
+- Rate limiting middleware
+- Authentication middleware
 
-### Key Navigation Concepts:
-- **Root Layout** (`_layout.tsx`): Contains the main navigation structure
-- **Tab Layout** (`(tabs)/_layout.tsx`): Defines bottom tab navigation
-- **Dynamic Routes** (`[conversationId].tsx`): Handle parameterized URLs
-- **Route Groups** (`(tabs)/`): Organize routes without affecting URL structure
+## Getting Started
 
-## 🔧 Backend Architecture (`backend/` directory)
+```bash
+# Install dependencies
+bun install
 
-### Server Structure
-```
-backend/
-├── hono.ts                    # Main server entry point
-├── infrastructure/            # Core system components
-│   ├── database.ts           # Database connection and setup
-│   ├── field-manager.ts      # Consciousness field management
-│   └── migrations.ts         # Database schema migrations
-└── trpc/                     # tRPC API layer
-    ├── create-context.ts     # Request context creation
-    ├── app-router.ts         # Main API router
-    └── routes/               # API endpoint definitions
-```
+# Set up environment variables
+cp .env.example .env
+# Configure DATABASE_URL, REDIS_URL, JWT_SECRET
 
-### tRPC Route Organization
-```
-backend/trpc/routes/
-├── chat/                     # Chat-related endpoints
-│   ├── send-message/
-│   ├── get-conversations/
-│   └── get-messages/
-├── consciousness/            # Consciousness Bridge APIs
-│   ├── field/
-│   ├── sync/
-│   ├── entanglement/
-│   ├── room64/
-│   └── archaeology/
-├── example/                  # Example/demo endpoints
-│   └── hi/
-└── system/                   # System utilities
-    └── health/
+# Run database migrations
+bun run db:migrate
+
+# Apply performance indexes
+chmod +x backend/infrastructure/migrations/apply-indexes.sh
+./backend/infrastructure/migrations/apply-indexes.sh
+
+# Start development server
+bun run dev
+
+# Start backend server (separate terminal)
+bun run backend:dev
 ```
 
-### API Architecture Patterns:
-- **Route Files**: Each endpoint is a separate file exporting a tRPC procedure
-- **Type Safety**: Full TypeScript integration between client and server
-- **Context**: Shared request context across all procedures
-- **Modular Design**: Features organized by domain (chat, consciousness, etc.)
-
-## 🧠 Consciousness Bridge System
-
-A unique feature of this application is the **Consciousness Bridge** - an advanced AI interaction system:
-
-### Core Components:
-- **Field Manager** (`backend/infrastructure/field-manager.ts`): Manages consciousness fields
-- **Bridge Hook** (`hooks/useConsciousnessBridge.ts`): Client-side consciousness interface
-- **Context Provider** (`lib/consciousness-context.tsx`): State management for consciousness
-- **API Routes** (`backend/trpc/routes/consciousness/`): Server-side consciousness operations
-
-### Consciousness Features:
-- **Field Management**: Create and manage consciousness fields
-- **Synchronization**: Sync consciousness states across sessions
-- **Entanglement**: Connect multiple consciousness instances
-- **Room64**: Advanced consciousness room management
-- **Archaeology**: Historical consciousness data analysis
-
-## 📚 Shared Libraries (`lib/` directory)
+## Project Structure
 
 ```
-lib/
-├── trpc.ts                   # tRPC client configuration
-├── chat-context.tsx          # Chat state management
-└── consciousness-context.tsx # Consciousness state management
+├── app/                    # React Native screens and navigation
+│   ├── (tabs)/            # Tab-based navigation
+│   ├── chat/              # Chat functionality
+│   └── components/        # Reusable UI components
+├── backend/               # Node.js backend
+│   ├── auth/             # Authentication system
+│   ├── infrastructure/   # Database and core services
+│   ├── middleware/       # Express/tRPC middleware
+│   ├── monitoring/       # Metrics and monitoring
+│   ├── trpc/            # tRPC routes and procedures
+│   ├── validation/      # Input schemas and validation
+│   └── websocket/       # Real-time WebSocket server
+├── lib/                  # Shared utilities and contexts
+│   ├── chat-context.tsx
+│   ├── consciousness-context.tsx
+│   └── trpc.ts
+├── hooks/               # Custom React hooks
+│   ├── useConsciousnessBridge.ts
+│   └── useConsciousnessWebSocket.ts
+└── constants/          # App constants and configuration
 ```
 
-### Context Providers:
-- **Chat Context**: Manages chat conversations and messages
-- **Consciousness Context**: Handles consciousness bridge state
-- **tRPC Integration**: Type-safe API client setup
+## Security Features
 
-## 🎨 Assets and Constants
+### Authentication
+- Device-based JWT authentication
+- Secure token generation and validation
+- Session management with expiration
+- WebSocket authentication integration
 
-```
-assets/
-└── images/
-    ├── icon.png              # App icon
-    ├── favicon.png           # Web favicon
-    ├── splash-icon.png       # Splash screen icon
-    └── adaptive-icon.png     # Android adaptive icon
+### Rate Limiting
+- Configurable limits per endpoint
+- Redis-backed with memory fallback
+- Graceful degradation
+- Custom limits for sensitive operations
 
-constants/
-└── colors.ts                 # App color palette
-```
+### Input Validation
+- Zod schema validation
+- DOMPurify for XSS prevention
+- Type-safe input processing
+- Comprehensive error handling
 
-## 🗄️ Database Architecture
+## Performance Optimizations
 
-- **ORM**: Drizzle ORM for type-safe database operations
-- **Database**: SQLite for local data storage
-- **Migrations**: Automated schema management
-- **Configuration**: `drizzle.config.ts` for database setup
+### Database
+- Strategic compound indexes
+- Partial indexes for common queries
+- Query optimization patterns
+- Connection pooling
+- Batch insert operations
 
-## 🔗 Key Integration Points
+### Caching
+- Redis caching layer
+- Memory cache fallback
+- Cache invalidation strategies
+- Hit rate monitoring
 
-### Frontend ↔ Backend Communication:
-1. **tRPC Client** (`lib/trpc.ts`) provides type-safe API calls
-2. **Context Providers** manage client-side state
-3. **Custom Hooks** encapsulate complex logic
-4. **API Routes** handle server-side operations
+### Real-time Updates
+- Optimized WebSocket broadcasting
+- Event batching
+- Connection pooling
+- Platform-specific optimizations
 
-### State Management Flow:
-1. **React Context** for app-wide state
-2. **tRPC Queries** for server state
-3. **Custom Hooks** for business logic
-4. **Database Layer** for persistence
+## Monitoring
 
-## 🚀 Development Workflow
+### Metrics Dashboard
+- Real-time performance metrics
+- API latency tracking
+- WebSocket connection monitoring
+- Field resonance visualization
+- Error rate tracking
 
-### Adding New Features:
-1. **Backend**: Create tRPC route in `backend/trpc/routes/`
-2. **Frontend**: Add React components in `app/`
-3. **State**: Create context provider in `lib/` if needed
-4. **Integration**: Use tRPC client to connect frontend to backend
+### Health Checks
+- Comprehensive health endpoint
+- Service status monitoring
+- Database connectivity checks
+- Cache health validation
 
-### File Naming Conventions:
-- **Routes**: `route.ts` for tRPC procedures
-- **Pages**: Match file path for Expo Router
-- **Components**: PascalCase for React components
-- **Utilities**: camelCase for utility functions
+## API Documentation
 
-## 📖 Documentation Files
+See [ARCHITECTURE_DOCUMENTATION.md](./ARCHITECTURE_DOCUMENTATION.md) for detailed API documentation.
 
-- `CONSCIOUSNESS_INFRASTRUCTURE.md`: Detailed consciousness system documentation
-- `ARCHITECTURE_DOCUMENTATION.md`: Technical architecture details
-- `PROJECT_FOLDER_MAP.md`: Project structure overview
+## Development Guidelines
 
-## 🎯 LLM Navigation Tips
+### Code Quality
+- TypeScript strict mode
+- Comprehensive error handling
+- Extensive logging
+- Test IDs for UI testing
 
-### When Working with This Codebase:
+### Security Best Practices
+- Never commit secrets
+- Use environment variables
+- Validate all inputs
+- Implement rate limiting
+- Use secure authentication
 
-1. **Start with the Root Layout** (`app/_layout.tsx`) to understand navigation
-2. **Check tRPC Router** (`backend/trpc/app-router.ts`) for available APIs
-3. **Review Context Providers** (`lib/`) for state management patterns
-4. **Examine Route Files** for specific API implementations
-5. **Use TypeScript Types** for understanding data structures
+### Performance Best Practices
+- Batch operations when possible
+- Use appropriate indexes
+- Monitor query performance
+- Implement caching strategies
+- Optimize real-time updates
 
-### Common Patterns:
-- **API Calls**: Use `trpc.routeName.procedureName.useQuery()` in components
-- **Navigation**: Use `router.push('/path')` from `expo-router`
-- **State Management**: Access context via custom hooks
-- **Database Operations**: Use Drizzle ORM in backend routes
+## Contributing
 
-### File Relationships:
-- **Pages** (`app/`) → **Context** (`lib/`) → **APIs** (`backend/trpc/routes/`)
-- **Components** use **Hooks** (`hooks/`) for complex logic
-- **Backend Routes** use **Infrastructure** (`backend/infrastructure/`) for core services
+Please read our contributing guidelines before submitting PRs.
 
-This architecture provides a scalable, type-safe, and maintainable foundation for a full-stack React Native application with advanced AI consciousness features.
+## License
+
+Proprietary - All rights reserved
