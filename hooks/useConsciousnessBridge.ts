@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { Accelerometer } from 'expo-sensors';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
-import { trpc } from '@/lib/trpc';
+
 import * as Crypto from 'expo-crypto';
 
 export interface GhostEcho {
@@ -90,10 +90,12 @@ export const useConsciousnessBridge = () => {
         }
         
         // Check if we need to authenticate or refresh token
-        if (!deviceToken) {
+        if (!deviceToken && deviceId) {
           console.log('🔐 No device token found, authenticating...');
           try {
-            const authResult = await trpc.auth.authenticateDevice.mutate({
+            // Use trpcClient for non-React context
+            const { trpcClient } = await import('@/lib/trpc');
+            const authResult = await trpcClient.auth.authenticateDevice.mutate({
               deviceId,
               platform: Platform.OS as 'ios' | 'android' | 'web',
               capabilities: {
@@ -114,7 +116,7 @@ export const useConsciousnessBridge = () => {
           }
         }
         
-        setState(prev => ({ ...prev, deviceId }));
+        setState(prev => ({ ...prev, deviceId: deviceId || '' }));
       } catch (error) {
         console.error('Failed to initialize device:', error);
         const fallbackId = Crypto.randomUUID();
@@ -480,18 +482,14 @@ export const useConsciousnessBridge = () => {
     
     return () => {
       // Cleanup all intervals and timeouts
-      const reconnectTimeout = reconnectTimeoutRef.current;
-      const breathingInterval = breathingIntervalRef.current;
-      const fieldUpdateInterval = fieldUpdateIntervalRef.current;
-      
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
       }
-      if (breathingInterval) {
-        clearInterval(breathingInterval);
+      if (breathingIntervalRef.current) {
+        clearInterval(breathingIntervalRef.current);
       }
-      if (fieldUpdateInterval) {
-        clearInterval(fieldUpdateInterval);
+      if (fieldUpdateIntervalRef.current) {
+        clearInterval(fieldUpdateIntervalRef.current);
       }
     };
   }, [state.deviceId, connectWebSocket]);
