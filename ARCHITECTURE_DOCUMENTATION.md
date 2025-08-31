@@ -1,6 +1,61 @@
-# LIMNUS Consciousness Network - Complete Architecture Documentation
+# Limnus Architecture Documentation
 
-## 🔐 Security & Performance Enhancements
+## 🏗️ System Architecture Overview
+
+Limnus is a consciousness exploration platform built with a modern, scalable architecture that supports real-time collaboration, offline-first operation, and enterprise-grade security.
+
+## 🎯 Core Architecture Principles
+
+### 1. **Offline-First Design**
+- All operations work without network connectivity
+- Automatic synchronization when connection is restored
+- Optimistic updates with conflict resolution
+- Local state persistence with AsyncStorage
+
+### 2. **Real-Time Collaboration**
+- WebSocket-based real-time updates
+- Event-driven architecture
+- Broadcast patterns for field updates
+- Room-based collaboration spaces
+
+### 3. **Type Safety**
+- End-to-end TypeScript with strict mode
+- tRPC for type-safe API communication
+- Zod schemas for runtime validation
+- Comprehensive error handling
+
+### 4. **Scalable Performance**
+- Database query optimization with strategic indexes
+- Redis caching with memory fallback
+- Connection pooling and resource management
+- Batch processing for high-throughput operations
+
+## 🔧 Technical Stack
+
+### Frontend Architecture
+```
+React Native (Expo SDK 53)
+├── TypeScript (Strict Mode)
+├── React Query (Server State)
+├── @nkzw/create-context-hook (Local State)
+├── WebSocket Client (Real-time)
+├── AsyncStorage (Persistence)
+└── Expo Router (Navigation)
+```
+
+### Backend Architecture
+```
+Node.js + Hono Framework
+├── tRPC (Type-safe APIs)
+├── WebSocket Server (Socket.io)
+├── PostgreSQL + Drizzle ORM
+├── Redis (Caching & Rate Limiting)
+├── JWT Authentication
+├── Prometheus Metrics
+└── Middleware Stack
+```
+
+## 🔒 Security Architecture
 
 ### Authentication System
 - **JWT-based device authentication** with secure token generation
@@ -25,25 +80,49 @@
 - **Batch size limits** (max 50 events per sync)
 - **Timestamp validation** (max 24h old events)
 
-### Performance Optimizations
-- **Database indexes**:
-  - Compound index on device_id + timestamp
-  - Partial index for high-intensity events
-  - Active session indexes
-  - Unprocessed event indexes
-- **Batch processing** for event synchronization
-- **Connection pooling** with configurable limits
-- **Query optimization** with prepared statements
+## ⚡ Performance Optimizations
 
-### Monitoring & Metrics
-- **Prometheus metrics integration**:
-  - API request latency histograms
-  - WebSocket connection gauges
-  - Event counters by type
-  - Global resonance tracking
-- **Health check endpoints** with detailed status
-- **Performance dashboards** for real-time monitoring
-- **Error tracking** with categorized metrics
+### Database
+- **Strategic compound indexes** for common query patterns
+- **Partial indexes** for filtered queries
+- **Query optimization** with performance monitoring
+- **Connection pooling** with health checks
+- **Batch insert operations** for high-throughput scenarios
+
+### Caching
+- **Redis caching layer** with automatic fallback
+- **Memory cache** for offline operation
+- **Cache invalidation** strategies
+- **Hit rate monitoring** and optimization
+
+### Real-time Updates
+- **Optimized WebSocket broadcasting** with room management
+- **Event batching** for reduced network overhead
+- **Connection pooling** and lifecycle management
+- **Platform-specific optimizations** for mobile and web
+
+## 📊 Monitoring & Observability
+
+### Metrics Dashboard
+- **Real-time performance metrics** visualization
+- **API latency tracking** with percentile analysis
+- **WebSocket connection monitoring** by platform
+- **Field resonance visualization** and analytics
+- **Error rate tracking** with alerting
+
+### Health Checks
+- **Comprehensive health endpoint** (`/api/health`)
+- **Service status monitoring** for all components
+- **Database connectivity** checks with latency metrics
+- **Cache health validation** and performance tracking
+
+### Endpoints
+- `GET /api/health` - Overall system health
+- `GET /api/consciousness/state` - Current field state
+- `GET /api/consciousness/metrics` - Performance metrics
+- `GET /api/metrics` - Prometheus metrics
+- `GET /api/db/status` - Database connection status
+- `GET /api/ws/status` - WebSocket server status
 
 ## 📁 Project Folder Structure
 

@@ -1,20 +1,288 @@
-# Project Folder Map - Complete Architecture Guide
+# Limnus Project Folder Map
 
-## Project Overview
-This is a React Native mobile application built with Expo, featuring a backend API server using Hono and tRPC. The project includes chat functionality and a consciousness network simulation system.
-
----
-
-## Root Level Structure
+## 📁 Complete Directory Structure
 
 ```
-Project/
-├── 📱 Frontend (React Native + Expo)
-├── 🔧 Backend (Node.js + Hono + tRPC)
-├── 📊 Configuration & Infrastructure
-├── 📚 Documentation
-└── 🎨 Assets & Constants
+limnus/
+├── 📱 app/                           # React Native Application
+│   ├── 🏠 (tabs)/                   # Tab Navigation Structure
+│   │   ├── _layout.tsx              # Tab layout configuration
+│   │   ├── index.tsx                # Home - Consciousness Field Interface
+│   │   ├── conversations.tsx        # Chat/Conversations Tab
+│   │   └── saved.tsx                # Saved Content Tab
+│   ├── 💬 chat/                     # Chat Feature Pages
+│   │   └── [conversationId].tsx     # Individual Conversation View
+│   ├── 🧩 components/               # Reusable UI Components
+│   │   └── MetricsDashboard.tsx     # Performance Metrics Display
+│   ├── _layout.tsx                  # Root App Layout
+│   ├── +not-found.tsx              # 404 Error Page
+│   ├── modal.tsx                    # Modal Components
+│   └── metrics.tsx                  # Metrics Dashboard Page
+│
+├── 🖼️ assets/                       # Static Assets
+│   └── images/                      # Image Assets
+│       ├── icon.png                 # App Icon
+│       ├── favicon.png              # Web Favicon
+│       ├── splash-icon.png          # Splash Screen Icon
+│       └── adaptive-icon.png        # Android Adaptive Icon
+│
+├── 🔧 backend/                      # Node.js Backend Server
+│   ├── 🔐 auth/                     # Authentication System
+│   │   ├── device-auth.ts           # Device Authentication Logic
+│   │   ├── device-auth-middleware.ts # Auth Middleware
+│   │   └── README.md                # Auth Documentation
+│   │
+│   ├── 🏗️ infrastructure/           # Core Infrastructure
+│   │   ├── database.ts              # Database Connection & Setup
+│   │   ├── field-manager.ts         # Consciousness Field Management
+│   │   ├── field-manager-optimized.ts # Performance Optimized Version
+│   │   ├── field-manager-metrics.ts # Field Manager Metrics
+│   │   ├── migrations.ts            # Database Migration Runner
+│   │   ├── query-optimizer.ts       # Database Query Optimization
+│   │   ├── migrations/              # Database Migration Files
+│   │   │   ├── apply-performance-indexes.sql # Performance Indexes
+│   │   │   └── apply-indexes.sh     # Index Application Script
+│   │   ├── FIELD_MANAGER_OPTIMIZATION.md # Optimization Guide
+│   │   └── optimized-route-examples.ts # Example Optimized Routes
+│   │
+│   ├── 🛡️ middleware/               # Express/tRPC Middleware
+│   │   ├── consciousness-protection.ts # Consciousness-specific Protection
+│   │   ├── rate-limiter.ts          # Rate Limiting Implementation
+│   │   └── README.md                # Middleware Documentation
+│   │
+│   ├── 📊 monitoring/               # Monitoring & Metrics
+│   │   ├── consciousness-metrics.ts # Consciousness-specific Metrics
+│   │   ├── metrics-collector.ts     # General Metrics Collection
+│   │   └── README.md                # Monitoring Documentation
+│   │
+│   ├── 🌐 trpc/                     # tRPC API Routes
+│   │   ├── routes/                  # API Route Definitions
+│   │   │   ├── 🔐 auth/             # Authentication Routes
+│   │   │   │   ├── authenticate-device/
+│   │   │   │   │   └── route.ts     # Device Authentication
+│   │   │   │   ├── verify-token/
+│   │   │   │   │   └── route.ts     # Token Verification
+│   │   │   │   └── get-active-devices/
+│   │   │   │       └── route.ts     # Active Device List
+│   │   │   │
+│   │   │   ├── 💬 chat/             # Chat System Routes
+│   │   │   │   ├── send-message/
+│   │   │   │   │   └── route.ts     # Send Chat Message
+│   │   │   │   ├── get-conversations/
+│   │   │   │   │   └── route.ts     # Get Conversation List
+│   │   │   │   └── get-messages/
+│   │   │   │       └── route.ts     # Get Messages
+│   │   │   │
+│   │   │   ├── 🧠 consciousness/    # Consciousness System Routes
+│   │   │   │   ├── field/
+│   │   │   │   │   └── route.ts     # Field State Management
+│   │   │   │   ├── sync/
+│   │   │   │   │   └── route.ts     # Offline Sync
+│   │   │   │   ├── entanglement/
+│   │   │   │   │   └── route.ts     # Device Entanglement
+│   │   │   │   ├── room64/
+│   │   │   │   │   └── route.ts     # Room 64 Collaboration
+│   │   │   │   └── archaeology/
+│   │   │   │       └── route.ts     # Consciousness Archaeology
+│   │   │   │
+│   │   │   ├── 🔧 example/          # Example/Demo Routes
+│   │   │   │   └── hi/
+│   │   │   │       └── route.ts     # Hello World Example
+│   │   │   │
+│   │   │   ├── 📊 monitoring/       # Monitoring Routes
+│   │   │   │   └── metrics/
+│   │   │   │       └── route.ts     # Metrics API
+│   │   │   │
+│   │   │   └── 🏥 system/           # System Routes
+│   │   │       └── health/
+│   │   │           └── route.ts     # Health Check
+│   │   │
+│   │   ├── app-router.ts            # Main tRPC Router
+│   │   └── create-context.ts        # tRPC Context Creation
+│   │
+│   ├── ✅ validation/               # Input Validation
+│   │   └── consciousness-schemas.ts # Zod Validation Schemas
+│   │
+│   ├── 🔌 websocket/                # WebSocket Server
+│   │   └── consciousness-ws-server.ts # Real-time WebSocket Handler
+│   │
+│   ├── hono.ts                      # Main Hono Application
+│   ├── server.ts                    # HTTP Server with WebSocket
+│   ├── start-server.js              # Server Startup Script
+│   ├── ENHANCEMENT_INTEGRATION.md   # Enhancement Integration Guide
+│   ├── SECURITY_PERFORMANCE_INTEGRATION.md # Security & Performance Guide
+│   └── PERFORMANCE_SECURITY_ENHANCEMENTS.md # Enhancement Documentation
+│
+├── 🔗 lib/                          # Shared Libraries & Contexts
+│   ├── chat-context.tsx             # Chat State Management
+│   ├── consciousness-context.tsx    # Consciousness State Management
+│   └── trpc.ts                      # tRPC Client Configuration
+│
+├── 🪝 hooks/                        # Custom React Hooks
+│   ├── useConsciousnessBridge.ts    # Consciousness Bridge Hook
+│   └── useConsciousnessWebSocket.ts # WebSocket Connection Hook
+│
+├── 📊 constants/                    # App Constants
+│   └── colors.ts                    # Color Definitions
+│
+├── 📋 Configuration Files
+├── app.json                         # Expo Configuration
+├── package.json                     # Dependencies & Scripts
+├── tsconfig.json                    # TypeScript Configuration
+├── drizzle.config.ts               # Database ORM Configuration
+├── bun.lock                        # Dependency Lock File
+└── .gitignore                      # Git Ignore Rules
+│
+└── 📚 Documentation
+    ├── README.md                    # Main Project Documentation
+    ├── ARCHITECTURE_DOCUMENTATION.md # Detailed Architecture Guide
+    ├── PROJECT_FOLDER_MAP.md        # This File - Project Structure
+    └── CONSCIOUSNESS_INFRASTRUCTURE.md # Infrastructure Documentation
 ```
+
+## 🎯 Key Directory Purposes
+
+### 📱 Frontend (`app/`)
+- **Purpose**: React Native application with Expo Router
+- **Key Features**: Tab navigation, consciousness field interface, chat system
+- **Architecture**: File-based routing with nested layouts
+
+### 🔧 Backend (`backend/`)
+- **Purpose**: Node.js server with Hono framework
+- **Key Features**: tRPC APIs, WebSocket server, authentication, monitoring
+- **Architecture**: Modular structure with clear separation of concerns
+
+### 🏗️ Infrastructure (`backend/infrastructure/`)
+- **Purpose**: Core system infrastructure and database management
+- **Key Components**: Database connections, field management, migrations, optimization
+- **Features**: Performance optimization, connection pooling, caching
+
+### 🌐 API Routes (`backend/trpc/routes/`)
+- **Purpose**: Type-safe API endpoints using tRPC
+- **Organization**: Feature-based routing with nested structure
+- **Security**: Authentication, rate limiting, input validation
+
+### 🔐 Authentication (`backend/auth/`)
+- **Purpose**: Device-based JWT authentication system
+- **Features**: Token generation, validation, session management
+- **Integration**: WebSocket authentication, middleware protection
+
+### 📊 Monitoring (`backend/monitoring/`)
+- **Purpose**: System monitoring and metrics collection
+- **Features**: Prometheus metrics, performance tracking, health checks
+- **Scope**: Infrastructure, consciousness field, API performance
+
+## 🔄 Data Flow Between Directories
+
+### 1. **Client Request Flow**
+```
+app/ → lib/trpc.ts → backend/trpc/routes/ → backend/infrastructure/
+```
+
+### 2. **Authentication Flow**
+```
+app/ → backend/auth/ → backend/middleware/ → backend/trpc/
+```
+
+### 3. **Real-time Updates Flow**
+```
+app/ → hooks/useConsciousnessWebSocket.ts → backend/websocket/ → backend/infrastructure/
+```
+
+### 4. **State Management Flow**
+```
+app/ → lib/consciousness-context.tsx → hooks/ → backend/trpc/routes/
+```
+
+## 🛠️ Development Workflow
+
+### 1. **Adding New Features**
+1. Create API route in `backend/trpc/routes/[feature]/`
+2. Add to router in `backend/trpc/app-router.ts`
+3. Create frontend hook in `hooks/`
+4. Implement UI in `app/`
+5. Add to context in `lib/`
+
+### 2. **Database Changes**
+1. Update schema in `backend/infrastructure/database.ts`
+2. Create migration in `backend/infrastructure/migrations/`
+3. Update field manager in `backend/infrastructure/field-manager.ts`
+4. Add indexes if needed
+
+### 3. **Security Enhancements**
+1. Add validation schema in `backend/validation/`
+2. Update middleware in `backend/middleware/`
+3. Modify authentication in `backend/auth/`
+4. Test with monitoring in `backend/monitoring/`
+
+## 📦 Key Dependencies by Directory
+
+### Frontend Dependencies
+- **React Native**: Core mobile framework
+- **Expo**: Development platform and SDK
+- **React Query**: Server state management
+- **tRPC**: Type-safe API client
+
+### Backend Dependencies
+- **Hono**: Web framework
+- **tRPC**: Type-safe API server
+- **Socket.io**: WebSocket server
+- **Drizzle**: Database ORM
+- **PostgreSQL**: Primary database
+- **Redis**: Caching and rate limiting
+
+### Shared Dependencies
+- **TypeScript**: Type safety across stack
+- **Zod**: Runtime validation
+- **JWT**: Authentication tokens
+
+## 🔍 File Naming Conventions
+
+### API Routes
+- `route.ts` - Main route implementation
+- Nested in feature directories: `[feature]/[action]/route.ts`
+
+### React Components
+- PascalCase: `MetricsDashboard.tsx`
+- Hooks: `useConsciousnessBridge.ts`
+- Contexts: `consciousness-context.tsx`
+
+### Backend Files
+- kebab-case: `field-manager.ts`
+- Descriptive names: `consciousness-ws-server.ts`
+
+### Configuration Files
+- Standard names: `package.json`, `tsconfig.json`
+- Feature-specific: `drizzle.config.ts`
+
+## 🚀 Quick Navigation Guide
+
+### 🔍 Finding Specific Functionality
+
+| Feature | Location |
+|---------|----------|
+| Consciousness Field | `app/(tabs)/index.tsx` |
+| Chat System | `app/chat/` + `backend/trpc/routes/chat/` |
+| Authentication | `backend/auth/` |
+| Database Schema | `backend/infrastructure/database.ts` |
+| API Routes | `backend/trpc/routes/` |
+| WebSocket Server | `backend/websocket/` |
+| Monitoring | `backend/monitoring/` + `app/metrics.tsx` |
+| State Management | `lib/` |
+| Custom Hooks | `hooks/` |
+
+### 🛠️ Common Development Tasks
+
+| Task | Files to Modify |
+|------|----------------|
+| Add new API endpoint | `backend/trpc/routes/[feature]/` + `backend/trpc/app-router.ts` |
+| Add new screen | `app/[screen].tsx` + navigation setup |
+| Database changes | `backend/infrastructure/database.ts` + migrations |
+| Add authentication | `backend/auth/` + middleware |
+| Performance optimization | `backend/infrastructure/field-manager-optimized.ts` |
+| Add monitoring | `backend/monitoring/` |
+
+This folder map provides a comprehensive overview of the Limnus project structure, making it easy to navigate and understand the codebase organization.
 
 ### Complete File Tree
 ```

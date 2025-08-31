@@ -43,7 +43,7 @@ export const trpcClient = trpc.createClient({
         console.log('tRPC fetch:', url, options?.method || 'GET');
         console.log('Base URL being used:', getBaseUrl());
         
-        const maxRetries = 2; // Reduce retries for faster fallback
+        const maxRetries = 3; // Allow more retries for better reliability
         let lastError: Error | null = null;
         
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -52,7 +52,7 @@ export const trpcClient = trpc.createClient({
             const timeoutId = setTimeout(() => {
               console.log(`tRPC request timeout (attempt ${attempt})`);
               controller.abort('Request timeout');
-            }, 8000); // Increased timeout to 8 seconds
+            }, 15000); // Increased timeout to 15 seconds for better reliability
             
             const response = await fetch(url, {
               ...options,
@@ -79,8 +79,8 @@ export const trpcClient = trpc.createClient({
                 throw new Error(`Server error: ${response.status} ${response.statusText}`);
               }
               
-              // Wait before retry with shorter backoff
-              await new Promise(resolve => setTimeout(resolve, attempt * 500));
+              // Wait before retry with exponential backoff
+              await new Promise(resolve => setTimeout(resolve, Math.min(attempt * 1000, 3000)));
               continue;
             }
             
