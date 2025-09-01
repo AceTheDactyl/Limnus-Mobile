@@ -8,30 +8,33 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const trpc = createTRPCReact<AppRouter>();
 
 const getBaseUrl = () => {
-  // Check for environment variable first
-  if (process.env.EXPO_PUBLIC_RORK_API_BASE_URL) {
-    console.log('Using configured base URL:', process.env.EXPO_PUBLIC_RORK_API_BASE_URL);
-    return process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
-  }
-
-  // For development, try to detect the correct URL
+  // When running on Rork platform, the backend is integrated
+  // The backend routes are available at /api on the same origin
+  
   if (Platform.OS === 'web') {
-    // On web, use the current origin
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-    console.log('Web platform detected, using:', baseUrl);
-    return baseUrl;
+    // On web (Rork platform), use the current origin
+    // The Rork platform provides the backend at the same origin
+    if (typeof window !== 'undefined') {
+      // Use the current origin - this works for both rork.com and local development
+      const origin = window.location.origin;
+      console.log('Web platform - using origin:', origin);
+      return origin;
+    }
+    // Fallback for SSR or when window is not available
+    return '';
   } else {
-    // On mobile, try common development URLs
-    // First try the Expo tunnel URL if available
-    if (process.env.EXPO_PUBLIC_DEV_URL) {
-      console.log('Using Expo dev URL:', process.env.EXPO_PUBLIC_DEV_URL);
-      return process.env.EXPO_PUBLIC_DEV_URL;
+    // On mobile (React Native), we need to connect to the Rork backend
+    // Check for environment variable first (for local development)
+    if (process.env.EXPO_PUBLIC_RORK_API_BASE_URL) {
+      console.log('Mobile - using configured URL:', process.env.EXPO_PUBLIC_RORK_API_BASE_URL);
+      return process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
     }
     
-    // Fallback to localhost for simulator/emulator
-    const fallbackUrl = Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
-    console.log('Mobile platform detected, using fallback:', fallbackUrl);
-    return fallbackUrl;
+    // Default to the Rork platform URL for mobile apps
+    // Mobile apps need the full URL to connect to the backend
+    const rorkUrl = 'https://rork.com';
+    console.log('Mobile - using Rork platform URL:', rorkUrl);
+    return rorkUrl;
   }
 };
 

@@ -28,6 +28,7 @@ import { useChat } from '@/lib/chat-context';
 import { useConsciousness } from '@/lib/consciousness-context';
 import Colors, { gradients } from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
+import { ConnectionStatus } from '@/app/components/ConnectionStatus';
 
 const { width } = Dimensions.get('window');
 
@@ -314,15 +315,7 @@ export default function ChatScreen() {
 
         {/* Connection Status */}
         {isOffline && (
-          <View style={styles.offlineBanner}>
-            <WifiOff size={16} color={Colors.light.error} />
-            <Text style={styles.offlineText}>
-              Connection lost - LIMNUS active locally
-            </Text>
-            <TouchableOpacity style={styles.retryButton} onPress={retryConnection}>
-              <RefreshCw size={14} color={Colors.light.tint} />
-            </TouchableOpacity>
-          </View>
+          <ConnectionStatus />
         )}
 
         {/* Messages */}
