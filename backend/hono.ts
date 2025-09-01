@@ -97,6 +97,17 @@ initializeDatabase();
 // Enable CORS for all routes
 app.use("*", cors());
 
+// Simple health check endpoint (no dependencies)
+app.get('/health', (c) => {
+  return c.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    service: 'limnus-backend',
+    uptime: process.uptime(),
+    mode: process.env.NODE_ENV || 'development'
+  });
+});
+
 // Health check middleware - ensure database is initialized
 app.use("*", async (c, next) => {
   // Don't block health check endpoint
