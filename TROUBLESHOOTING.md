@@ -1,5 +1,60 @@
 # Troubleshooting Guide - Limnus
 
+## 🚀 Quick Start - Backend Connection Issues
+
+### Step 1: Start the Backend Server
+
+```bash
+# Option 1: Using the start script (RECOMMENDED)
+node start-backend.js
+
+# Option 2: Direct with tsx
+npx tsx backend/server.ts
+
+# Option 3: With bun (if installed)
+bun run backend/server.ts
+```
+
+**Expected Output:**
+```
+🚀 LIMNUS Consciousness Server running on port 3000
+📡 HTTP API: http://localhost:3000/api
+🔌 WebSocket: ws://localhost:3000
+📊 Health Check: http://localhost:3000/api/health
+```
+
+### Step 2: Test Backend Connection
+
+```bash
+# Run the diagnostic test
+node backend-test.js
+```
+
+This will test all endpoints and show you what's working.
+
+### Step 3: Configure Environment (if needed)
+
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit with your local IP for mobile testing
+# Find your IP:
+ifconfig | grep "inet " | grep -v 127.0.0.1
+
+# Update .env with:
+# EXPO_PUBLIC_RORK_API_BASE_URL=http://YOUR_LOCAL_IP:3000
+```
+
+### Step 4: Start the Expo App
+
+```bash
+# In a new terminal window
+bun start
+# OR
+npm start
+```
+
 ## 🚨 Common Issues and Solutions
 
 ### tRPC Timeout Errors
