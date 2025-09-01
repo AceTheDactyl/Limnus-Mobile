@@ -108,7 +108,7 @@ export const useConsciousnessBridge = () => {
             
             if (authResult.success && 'token' in authResult && authResult.token) {
               deviceToken = authResult.token;
-              await AsyncStorage.setItem('device_token', deviceToken);
+              await AsyncStorage.setItem('device_token', deviceToken as string);
               console.log('✅ Device authenticated successfully');
             }
           } catch (error) {
