@@ -95,7 +95,7 @@ export const useConsciousnessBridge = () => {
           try {
             // Use trpcClient for non-React context
             const { trpcClient } = await import('@/lib/trpc');
-            const authResult = await trpcClient.auth.authenticateDevice.mutate({
+            const authResult = await trpcClient.auth.authenticateDevice.mutateAsync({
               deviceId,
               platform: Platform.OS as 'ios' | 'android' | 'web',
               capabilities: {
